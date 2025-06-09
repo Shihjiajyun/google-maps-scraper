@@ -892,7 +892,7 @@ class GoogleMapsDetailedScraper:
                         self.debug_print(f"    📍 地址: {shop_info.get('address', '未獲取')[:30]}...", "INFO")
                         self.debug_print(f"    🕒 營業時間: {shop_info.get('hours', '未獲取')[:30]}...", "INFO")
                         self.debug_print(f"    ⭐ 評分: {shop_info.get('rating', '未獲取')}", "INFO")
-                        self.debug_print(f"📊 總店家數進度: {len(self.shops_data)}/600", "INFO")
+                        self.debug_print(f"📊 總店家數進度: {len(self.shops_data)}/{self.target_shops}", "INFO")
                         processed_count += 1
                         
                         # 🎯 每新增一家店家就檢查是否達到目標
@@ -1658,9 +1658,9 @@ class GoogleMapsDetailedScraper:
                     self.debug_print(f"[{j}/{len(shop_types)}] 在 {location} 周圍 {self.search_radius_km}km 內搜尋: {shop_type}", "INFO")
                     self.debug_print(f"進度: {current_search}/{total_searches} ({(current_search/total_searches)*100:.1f}%)", "INFO")
                     
-                    # 🎯 檢查店家數量是否超過600家
-                    if len(self.shops_data) >= 600:
-                        self.debug_print(f"🎯 達到目標！已收集 {len(self.shops_data)} 家店家 (超過600家)", "SUCCESS")
+                    # 🎯 檢查店家數量是否超過目標
+                    if len(self.shops_data) >= self.target_shops:
+                        self.debug_print(f"🎯 達到目標！已收集 {len(self.shops_data)} 家店家 (超過{self.target_shops}家)", "SUCCESS")
                         self.debug_print("🛑 自動停止搜尋，準備輸出結果...", "INFO")
                         break
                     
@@ -1670,18 +1670,18 @@ class GoogleMapsDetailedScraper:
                     
                     should_continue = self.scroll_and_extract_with_details()
                     if not should_continue:
-                        self.debug_print(f"🎯 達到600家目標，停止搜尋", "SUCCESS")
+                        self.debug_print(f"🎯 達到{self.target_shops}家目標，停止搜尋", "SUCCESS")
                         break
                     elif should_continue is False:
                         self.debug_print(f"擷取 {location} 的 '{shop_type}' 結果失敗，跳過", "ERROR")
                         continue
                     
                     self.debug_print(f"在 {location} 搜尋 '{shop_type}' 完成", "SUCCESS")
-                    self.debug_print(f"📊 目前總店家數: {len(self.shops_data)}/600", "INFO")
+                    self.debug_print(f"📊 目前總店家數: {len(self.shops_data)}/{self.target_shops}", "INFO")
                     
                     # 🎯 再次檢查店家數量
-                    if len(self.shops_data) >= 600:
-                        self.debug_print(f"🎯 達到目標！已收集 {len(self.shops_data)} 家店家 (超過600家)", "SUCCESS")
+                    if len(self.shops_data) >= self.target_shops:
+                        self.debug_print(f"🎯 達到目標！已收集 {len(self.shops_data)} 家店家 (超過{self.target_shops}家)", "SUCCESS")
                         self.debug_print("🛑 自動停止搜尋，準備輸出結果...", "INFO")
                         break
                     
@@ -1692,7 +1692,7 @@ class GoogleMapsDetailedScraper:
                         time.sleep(wait_time)
                 
                 # 🎯 如果達到目標店家數，跳出外層迴圈
-                if len(self.shops_data) >= 600:
+                if len(self.shops_data) >= self.target_shops:
                     self.debug_print("🎯 已達到目標店家數量，停止所有搜尋", "SUCCESS")
                     break
                 
@@ -1767,7 +1767,7 @@ class GoogleMapsDetailedScraper:
                 self.debug_print("程式執行完成", "SUCCESS")
 
 def main():
-    """主程式 - 詳細版（整合快速版改進邏輯 + 600家自動停止）"""
+    """主程式 - 詳細版（整合快速版改進邏輯 + 2000家自動停止）"""
     print("🚀 Google 地圖店家詳細資訊擷取程式 【改進版 + 智能停止】")
     print("✨ 整合快速版的優化邏輯 + 詳細資訊擷取功能")
     print()
@@ -1777,21 +1777,21 @@ def main():
     print("   - ✅ 重試機制和多種名稱擷取方法")
     print("   - ✅ 改進的滾動策略和進度統計")
     print("   - ✅ 每個位置重置店家列表，確保完整抓取")
-    print("   - 🆕 智能停止：達到600家店自動停止並輸出Excel")
+    print("   - 🆕 智能停止：達到2000家店自動停止並輸出Excel")
     print()
     print("🎯 智能停止功能：")
     print("   - 🛑 程式會持續監控店家數量")
-    print("   - 📊 當達到600家店時自動停止搜尋")
+    print("   - 📊 當達到2000家店時自動停止搜尋")
     print("   - 📁 自動輸出Excel格式檔案(.xlsx)")
     print("   - 💾 同時保存CSV備份檔案")
-    print("   - ⏰ 大幅縮短執行時間（預估2-3小時）")
+    print("   - ⏰ 大幅縮短執行時間（預估48-72小時）")
     print()
     print("📊 詳細功能：")
-    print("   - 搜索半徑縮小為 5 公里，更精確")
-    print("   - 涵蓋 200+ 個高雄重要地點和商圈")
+    print("   - 搜索半徑縮小為 3 公里，超精確")
+    print("   - 涵蓋 1000+ 個高雄重要地點和商圈")
     print("   - 包含行政區中心、商圈、交通節點、新興發展區")
-    print("   - 7 種美甲美睫相關店家類型")
-    print("   - 最多搜尋次數：約1400次（智能停止）")
+    print("   - 8 種美甲美睫相關店家類型")
+    print("   - 180% 覆蓋率確保無遺漏")
     print()
     print("📍 搜尋地點涵蓋：")
     print("   - 行政區中心：火車站、區公所、主要商業區")
@@ -1800,7 +1800,7 @@ def main():
     print("   - 新興發展區：亞洲新灣區、橋頭新市鎮")
     print()
     print("🏪 店家類型：")
-    print("   - 美甲、美睫、指甲彩繪、凝膠指甲、光療指甲、手足保養、耳燭")
+    print("   - 美甲、美睫、指甲彩繪、凝膠指甲、光療指甲、手足保養、耳燭、熱蠟")
     print()
     print("📋 獲取資訊：")
     print("   - 店家名稱、地址、電話、營業時間、評分、Google Maps連結")
@@ -1813,13 +1813,13 @@ def main():
     print("   - 🔄 多重重試機制，提高資料品質")
     print("   - 🎯 智能停止機制，節省時間")
     print("-" * 70)
-    print("⏰ 預估執行時間：約 2-3 小時（智能停止）")
+    print("⏰ 預估執行時間：約 48-72 小時（智能停止）")
     print("💾 結果會自動儲存為Excel(.xlsx)和CSV檔案")
     print("🔄 程式會自動處理重複店家，確保資料品質")
-    print("🎯 目標：收集600家高品質美甲美睫店家資料")
+    print("🎯 目標：收集2000家高品質美甲美睫店家資料")
     print()
     
-    user_input = input("確定要開始智能版詳細搜索嗎？(y/n): ").strip().lower()
+    user_input = input("確定要開始2000家店智能版詳細搜索嗎？(y/n): ").strip().lower()
     if user_input != 'y':
         print("程式已取消")
         return
