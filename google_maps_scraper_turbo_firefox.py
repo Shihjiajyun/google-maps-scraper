@@ -45,7 +45,8 @@ class GoogleMapsTurboFirefoxScraper:
         self.current_location = None
         self.search_radius_km = 8  # 增加搜尋半徑到8公里
         self.target_shops = 2000
-        self.max_shops_per_search = 25  # 每次搜索最多處理25家店
+        self.max_shops_per_search = 20  # 詳細模式：減少為20家店保證質量
+        self.max_scrolls = 5    # 詳細模式：減少滾動次數
         
     def setup_logging(self):
         """設定日誌記錄"""
@@ -240,8 +241,8 @@ class GoogleMapsTurboFirefoxScraper:
             self.debug_print(f"搜尋失敗: {e}", "ERROR")
             return False
     
-    def extract_shop_info_basic(self, link_element):
-        """基本版店家資訊擷取 - 只獲取關鍵信息，不點進詳細頁面"""
+    def extract_shop_info_detailed(self, link_element):
+        """詳細版店家資訊擷取 - 點擊進入詳細頁面獲取完整信息包括電話和地址"""
         try:
             shop_info = {}
             
@@ -297,44 +298,165 @@ class GoogleMapsTurboFirefoxScraper:
             shop_info['google_maps_url'] = link_element.get_attribute('href')
             shop_info['browser'] = 'Firefox'
             
-            # 嘗試從周圍元素快速獲取基本信息
+            # 點擊進入詳細頁面獲取完整信息
             try:
-                # 尋找附近的評分信息
-                parent_container = link_element.find_element(By.XPATH, "../../..")
-                rating_elements = parent_container.find_elements(By.CSS_SELECTOR, "[aria-label*='星']")
-                if rating_elements:
-                    rating_text = rating_elements[0].get_attribute('aria-label')
-                    shop_info['rating'] = rating_text if rating_text else '評分未提供'
-                else:
-                    shop_info['rating'] = '評分未提供'
+                self.debug_print(f"🔍 點擊進入 {name} 詳細頁面", "EXTRACT")
                 
-                # 尋找地址信息
-                address_elements = parent_container.find_elements(By.CSS_SELECTOR, ".fontBodyMedium")
-                address_found = False
-                for addr_elem in address_elements[:3]:  # 只檢查前3個
-                    addr_text = addr_elem.text.strip()
-                    if addr_text and ('路' in addr_text or '街' in addr_text or '區' in addr_text):
-                        shop_info['address'] = addr_text
-                        address_found = True
-                        break
+                # 使用JavaScript點擊，避免元素遮擋問題
+                self.driver.execute_script("arguments[0].click();", link_element)
+                time.sleep(2)  # 等待頁面載入
                 
-                if not address_found:
-                    shop_info['address'] = '地址未提供'
-                    
-                # 設定預設值
-                shop_info['phone'] = '電話未提供'
-                shop_info['hours'] = '營業時間未提供'
+                # 獲取詳細信息
+                detailed_info = self.extract_detailed_info_from_page()
                 
-            except:
-                shop_info['address'] = '地址未提供'
-                shop_info['phone'] = '電話未提供'
-                shop_info['hours'] = '營業時間未提供'
-                shop_info['rating'] = '評分未提供'
+                # 合併詳細信息
+                shop_info.update(detailed_info)
+                
+                # 返回列表頁面
+                self.driver.back()
+                time.sleep(1.5)  # 等待返回
+                
+            except Exception as e:
+                self.debug_print(f"獲取詳細信息失敗 {name}: {e}", "ERROR")
+                # 如果詳細頁面失敗，使用基本信息
+                shop_info.update({
+                    'address': '地址獲取失敗',
+                    'phone': '電話獲取失敗', 
+                    'hours': '營業時間獲取失敗',
+                    'rating': '評分獲取失敗'
+                })
+                
+                # 嘗試返回列表頁面
+                try:
+                    self.driver.back()
+                    time.sleep(1)
+                except:
+                    pass
             
             return shop_info
             
         except Exception as e:
             return None
+    
+    def extract_detailed_info_from_page(self):
+        """從店家詳細頁面擷取完整信息"""
+        detailed_info = {
+            'address': '地址未提供',
+            'phone': '電話未提供',
+            'hours': '營業時間未提供',
+            'rating': '評分未提供'
+        }
+        
+        try:
+            # 等待頁面載入完成
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+            
+            # 獲取地址信息
+            address_selectors = [
+                "[data-item-id='address'] .fontBodyMedium",
+                "[data-item-id='address'] .DkEaL",
+                "button[data-item-id='address'] .fontBodyMedium",
+                ".Io6YTe.fontBodyMedium[data-item-id='address']",
+                "[aria-label*='地址'] .fontBodyMedium",
+                ".fontBodyMedium:contains('台灣')",
+                ".fontBodyMedium:contains('高雄')",
+            ]
+            
+            for selector in address_selectors:
+                try:
+                    if ':contains(' in selector:
+                        # 使用XPath處理contains
+                        xpath = f"//div[contains(@class, 'fontBodyMedium') and (contains(text(), '台灣') or contains(text(), '高雄'))]"
+                        address_elem = self.driver.find_element(By.XPATH, xpath)
+                    else:
+                        address_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    
+                    address_text = address_elem.text.strip()
+                    if address_text and len(address_text) > 5:
+                        detailed_info['address'] = address_text
+                        self.debug_print(f"✅ 找到地址: {address_text[:30]}...", "SUCCESS")
+                        break
+                except:
+                    continue
+            
+            # 獲取電話信息
+            phone_selectors = [
+                "[data-item-id='phone:tel:'] .fontBodyMedium",
+                "button[data-item-id*='phone'] .fontBodyMedium", 
+                "[aria-label*='電話'] .fontBodyMedium",
+                "a[href^='tel:']",
+                ".fontBodyMedium[jslog*='phone']",
+                "[data-value*='phone'] .fontBodyMedium"
+            ]
+            
+            for selector in phone_selectors:
+                try:
+                    phone_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    phone_text = phone_elem.text.strip()
+                    
+                    # 驗證電話格式
+                    if phone_text and (phone_text.startswith('0') or '+' in phone_text or '-' in phone_text):
+                        detailed_info['phone'] = phone_text
+                        self.debug_print(f"✅ 找到電話: {phone_text}", "SUCCESS")
+                        break
+                        
+                    # 也檢查href屬性
+                    href = phone_elem.get_attribute('href')
+                    if href and href.startswith('tel:'):
+                        phone_number = href.replace('tel:', '').strip()
+                        if phone_number:
+                            detailed_info['phone'] = phone_number
+                            self.debug_print(f"✅ 找到電話(href): {phone_number}", "SUCCESS")
+                            break
+                except:
+                    continue
+            
+            # 獲取營業時間
+            hours_selectors = [
+                "[data-item-id='oh'] .fontBodyMedium",
+                "[aria-label*='營業時間'] .fontBodyMedium",
+                ".fontBodyMedium[jslog*='hours']",
+                "[data-value*='hours'] .fontBodyMedium",
+                ".t39EBf.GUrTXd .fontBodyMedium"  # 營業時間的常見CSS
+            ]
+            
+            for selector in hours_selectors:
+                try:
+                    hours_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    hours_text = hours_elem.text.strip()
+                    if hours_text and ('時' in hours_text or ':' in hours_text or '營業' in hours_text):
+                        detailed_info['hours'] = hours_text
+                        self.debug_print(f"✅ 找到營業時間: {hours_text[:30]}...", "SUCCESS")
+                        break
+                except:
+                    continue
+            
+            # 獲取評分信息
+            rating_selectors = [
+                ".F7nice span[aria-hidden='true']",
+                "[aria-label*='星'] span",
+                ".fontDisplayLarge[aria-hidden='true']",
+                ".F7nice .fontDisplayLarge"
+            ]
+            
+            for selector in rating_selectors:
+                try:
+                    rating_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    rating_text = rating_elem.text.strip()
+                    if rating_text and ('.' in rating_text or rating_text.replace('.', '').isdigit()):
+                        detailed_info['rating'] = f"{rating_text} 星"
+                        self.debug_print(f"✅ 找到評分: {rating_text} 星", "SUCCESS")
+                        break
+                except:
+                    continue
+            
+            return detailed_info
+            
+        except Exception as e:
+            self.debug_print(f"詳細信息擷取錯誤: {e}", "ERROR")
+            return detailed_info
     
     def scroll_and_extract_turbo(self):
         """高速滾動並擷取店家資訊"""
@@ -347,8 +469,8 @@ class GoogleMapsTurboFirefoxScraper:
             
             last_count = 0
             no_change_count = 0
-            max_no_change = 2  # 高速模式：2次無變化停止
-            max_scrolls = 5    # 高速模式：最多5次滾動
+            max_no_change = 3  # 增強模式：3次無變化停止
+            max_scrolls = self.max_scrolls    # 使用類變數設定的滾動次數
             scroll_count = 0
             
             while scroll_count < max_scrolls and no_change_count < max_no_change:
@@ -452,7 +574,7 @@ class GoogleMapsTurboFirefoxScraper:
                     except:
                         pass
                     
-                    shop_info = self.extract_shop_info_basic(link)
+                    shop_info = self.extract_shop_info_detailed(link)
                     if not shop_info:
                         continue
                     
@@ -588,92 +710,86 @@ class GoogleMapsTurboFirefoxScraper:
     def get_key_search_locations(self):
         """獲取關鍵搜索地點列表 - 聚焦主要商業區"""
         
-        # 主要商業核心區域（高密度區域）
+        # 擴大覆蓋範圍 - 增加更多搜索地點
         core_locations = [
             # 高雄市中心核心
-            "高雄火車站",
-            "五福商圈",
-            "新崛江商圈", 
-            "大立百貨",
-            "漢來大飯店",
-            "統一夢時代購物中心",
-            "中山大學",
-            "高雄醫學大學",
-            "文化中心",
-            "六合夜市",
-            "瑞豐夜市",
+            "高雄火車站", "五福商圈", "新崛江商圈", "大立百貨", "漢來大飯店",
+            "統一夢時代購物中心", "中山大學", "高雄醫學大學", "文化中心", 
+            "六合夜市", "瑞豐夜市", "三多商圈", "中央公園",
             
-            # 鳳山區重點
-            "鳳山火車站",
-            "鳳山區公所",
-            "大東文化藝術中心",
-            "正修科技大學",
-            "澄清湖",
+            # 鳳山區
+            "鳳山火車站", "鳳山區公所", "大東文化藝術中心", "正修科技大學", 
+            "澄清湖", "鳳山中山路", "鳳山青年路", "衛武營",
             
-            # 左營楠梓區重點
-            "高雄左營站",
-            "新光三越左營店",
-            "漢神巨蛋",
-            "楠梓火車站",
-            "高雄大學",
-            "右昌",
+            # 左營楠梓區
+            "高雄左營站", "新光三越左營店", "漢神巨蛋", "楠梓火車站",
+            "高雄大學", "右昌", "左營蓮池潭", "半屏山",
             
-            # 三民區重點
-            "建工路商圈",
-            "民族路商圈",
-            "九如路",
-            "十全路",
+            # 三民區
+            "建工路商圈", "民族路商圈", "九如路", "十全路", "大豐路",
+            "覺民路", "三民家商", "高雄車站",
             
-            # 苓雅區重點
-            "苓雅區公所",
-            "成功路",
-            "光華路",
-            "青年路",
+            # 苓雅區
+            "苓雅區公所", "成功路", "光華路", "青年路", "四維路",
+            "中正路", "民權路", "林德官",
             
-            # 前鎮小港區重點
-            "草衙道",
-            "小港機場",
-            "前鎮區公所",
-            "獅甲",
+            # 前鎮小港區
+            "草衙道", "小港機場", "前鎮區公所", "獅甲", "小港醫院",
+            "前鎮高中", "小港區公所", "中鋼",
             
-            # 鼓山區重點
-            "西子灣",
-            "駁二藝術特區",
-            "美術館",
-            "內惟",
+            # 鼓山區
+            "西子灣", "駁二藝術特區", "美術館", "內惟", "鼓山區公所",
+            "明誠路", "美術東路", "博愛路",
             
-            # 岡山區重點
-            "岡山火車站",
-            "岡山區公所",
+            # 新興區
+            "新興區公所", "中山路", "七賢路", "林森路", "新興高中",
             
-            # 其他重要區域
-            "路竹火車站",
-            "橋頭火車站",
-            "大寮區公所",
-            "林園區公所",
-            "旗山火車站",
-            "美濃區公所",
+            # 前金區
+            "前金區公所", "中正路", "成功路", "市議會", "勞工公園",
             
-            # 重要購物中心
-            "大遠百",
-            "太平洋SOGO",
-            "環球購物中心",
-            "義大世界",
-            "好市多高雄店",
-            "IKEA高雄店",
+            # 鹽埕區
+            "鹽埕區公所", "大勇路", "七賢路", "駁二", "愛河",
             
-            # 重要醫院
-            "高雄榮總",
-            "高雄醫學大學附設醫院",
-            "長庚紀念醫院",
-            "義大醫院",
+            # 岡山區
+            "岡山火車站", "岡山區公所", "岡山高中", "岡山夜市",
             
-            # 重要夜市
-            "光華夜市",
-            "南華路夜市",
-            "興中夜市",
-            "凱旋夜市",
-            "青年夜市"
+            # 路竹區
+            "路竹火車站", "路竹區公所", "路竹高中",
+            
+            # 橋頭區
+            "橋頭火車站", "橋頭區公所", "橋頭糖廠",
+            
+            # 大寮區
+            "大寮區公所", "大寮車站", "義守大學",
+            
+            # 林園區
+            "林園區公所", "林園高中",
+            
+            # 旗山區
+            "旗山車站", "旗山區公所", "旗山老街",
+            
+            # 美濃區
+            "美濃區公所", "美濃車站",
+            
+            # 購物中心
+            "大遠百", "太平洋SOGO", "環球購物中心", "義大世界",
+            "好市多高雄店", "IKEA高雄店", "家樂福", "大潤發",
+            
+            # 醫院
+            "高雄榮總", "高雄醫學大學附設醫院", "長庚紀念醫院", 
+            "義大醫院", "阮綜合醫院", "國軍高雄總醫院",
+            
+            # 夜市和商圈
+            "光華夜市", "南華路夜市", "興中夜市", "凱旋夜市", 
+            "青年夜市", "自強夜市", "忠孝夜市", "鳳山第一公有零售市場",
+            
+            # 大學和學校
+            "中山大學", "高雄大學", "高雄師範大學", "高雄應用科技大學",
+            "樹德科技大學", "文藻外語大學", "東方設計大學",
+            
+            # 重要道路和地標
+            "博愛路", "民生路", "中華路", "中山路", "青年路",
+            "建國路", "自由路", "同盟路", "澄清路", "鳥松區公所"
         ]
         
         self.debug_print(f"🦊 Firefox高速模式：聚焦 {len(core_locations)} 個核心商業區", "FIREFOX")
@@ -691,7 +807,7 @@ class GoogleMapsTurboFirefoxScraper:
             self.debug_print("⚡ 專為快速收集2000家店家設計", "TURBO")
             self.debug_print(f"🎯 搜尋半徑: {self.search_radius_km} 公里 (高效模式)", "INFO")
             self.debug_print(f"🦊 每次處理: {self.max_shops_per_search} 家店家", "INFO")
-            self.debug_print("🔧 優化特色：Firefox瀏覽器、大半徑搜索、快速基本信息", "INFO")
+            self.debug_print("🔧 優化特色：Firefox瀏覽器、大半徑搜索、詳細信息擷取", "INFO")
             print("=" * 80)
             
             if not self.setup_driver():
@@ -703,8 +819,13 @@ class GoogleMapsTurboFirefoxScraper:
             # 高速模式：聚焦核心地點
             locations = self.get_key_search_locations()
             
-            # 高速模式：美甲美睫相關店家類型
-            shop_types = ["美甲", "美睫", "指甲彩繪", "手足保養"]
+            # 增強模式：擴大店家類型搜索
+            shop_types = [
+                "美甲店", "美睫店", "指甲彩繪", "手足保養", "美甲美睫",
+                "nail salon", "eyelash extension", "美容美甲",
+                "指甲店", "睫毛店", "美甲工作室", "美睫工作室",
+                "nail art", "美甲沙龍", "美睫沙龍"
+            ]
             
             self.debug_print("【Firefox高速搜索模式】設定：", "FIREFOX")
             self.debug_print(f"📍 核心地點: {len(locations)} 個商業區", "INFO")
@@ -712,7 +833,7 @@ class GoogleMapsTurboFirefoxScraper:
             self.debug_print(f"🎯 搜索半徑: {self.search_radius_km}km", "INFO")
             self.debug_print(f"🦊 每輪處理: {self.max_shops_per_search}家店家", "INFO")
             self.debug_print(f"🔍 預估搜尋次數: {len(locations) * len(shop_types)} 次", "INFO")
-            self.debug_print("⏰ 預估完成時間: 30-60分鐘", "TURBO")
+            self.debug_print("⏰ 預估完成時間: 60-120分鐘 (詳細模式)", "TURBO")
             print("-" * 70)
             
             total_searches = len(locations) * len(shop_types)
@@ -826,8 +947,8 @@ def main():
     print("   - 🦊 使用Firefox瀏覽器，避免Chrome衝突")
     print("   - 🚀 搜索半徑增加到8公里，減少搜索次數")
     print("   - 📍 聚焦60個核心商業區，避免過度細分")
-    print("   - ⚡ 每輪處理25家店家，大幅提升效率")
-    print("   - 🔧 簡化詳細信息獲取，優先收集基本信息")
+    print("   - ⚡ 每輪處理20家店家，確保信息完整性")
+    print("   - 🔧 詳細信息獲取，包含電話、地址、營業時間")
     print("   - ⏰ 大幅減少等待時間")
     print("   - 🎯 智能停止：達到2000家自動停止")
     print()
@@ -844,8 +965,10 @@ def main():
     print()
     print("📋 收集資訊：")
     print("   - 店家名稱、Google Maps連結")
-    print("   - 基本地址信息（如可獲取）")
-    print("   - 評分信息（如可獲取）")
+    print("   - 📍 詳細地址信息（點擊獲取）")
+    print("   - 📞 電話號碼（點擊獲取）")
+    print("   - ⭐ 評分信息（點擊獲取）")
+    print("   - 🕐 營業時間（點擊獲取）")
     print("   - 搜索位置記錄")
     print()
     print("💡 與Chrome版本並行：")
