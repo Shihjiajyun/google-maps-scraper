@@ -85,30 +85,40 @@ class GoogleMapsTurboFirefoxScraper:
             self.debug_print("正在設定Firefox高速瀏覽器...", "FIREFOX")
             firefox_options = Options()
             
-            # Firefox高速模式設定
+            # 基本穩定配置
+            firefox_options.add_argument("--headless")  # 強制無頭模式更穩定
             firefox_options.add_argument("--no-sandbox")
             firefox_options.add_argument("--disable-dev-shm-usage")
+            firefox_options.add_argument("--disable-gpu")
+            firefox_options.add_argument("--disable-extensions")
+            
+            # 設定窗口大小
             firefox_options.add_argument("--width=1920")
             firefox_options.add_argument("--height=1080")
             
-            # 禁用圖片和廣告以提高速度
-            firefox_options.set_preference("permissions.default.image", 2)
-            firefox_options.set_preference("dom.ipc.plugins.enabled.libflashplayer.so", False)
-            firefox_options.set_preference("media.volume_scale", "0.0")
+            # 簡化的偏好設置
+            prefs = {
+                # 禁用圖片加載
+                "permissions.default.image": 2,
+                # 禁用通知
+                "dom.webnotifications.enabled": False,
+                "dom.push.enabled": False,
+                # 禁用地理位置
+                "geo.enabled": False,
+                # 禁用自動更新
+                "app.update.enabled": False,
+                "app.update.auto": False,
+                # 設置用戶代理
+                "general.useragent.override": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
+            }
             
-            # 禁用不必要的功能
-            firefox_options.set_preference("geo.enabled", False)
-            firefox_options.set_preference("geo.provider.use_corelocation", False)
-            firefox_options.set_preference("geo.prompt.testing", False)
-            firefox_options.set_preference("geo.prompt.testing.allow", False)
+            for key, value in prefs.items():
+                firefox_options.set_preference(key, value)
             
-            # 設定用戶代理
-            firefox_options.set_preference("general.useragent.override", 
-                "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0")
+            # 設定日誌級別
+            firefox_options.log.level = "fatal"
             
-            if not self.debug_mode:
-                firefox_options.add_argument("--headless")
-            
+            self.debug_print("🦊 啟動Firefox (無頭模式)...", "FIREFOX")
             self.driver = webdriver.Firefox(options=firefox_options)
             self.driver.set_window_size(1920, 1080)
             
@@ -117,7 +127,17 @@ class GoogleMapsTurboFirefoxScraper:
             
         except Exception as e:
             self.debug_print(f"Firefox瀏覽器設定失敗: {e}", "ERROR")
-            return False
+            # 嘗試最簡配置
+            try:
+                self.debug_print("🦊 嘗試最簡Firefox配置...", "FIREFOX")
+                simple_options = Options()
+                simple_options.add_argument("--headless")
+                self.driver = webdriver.Firefox(options=simple_options)
+                self.debug_print("Firefox簡單配置成功", "SUCCESS")
+                return True
+            except Exception as e2:
+                self.debug_print(f"Firefox簡單配置也失敗: {e2}", "ERROR")
+                return False
     
     def open_google_maps(self):
         """開啟 Google 地圖"""
