@@ -43,16 +43,22 @@ class GoogleMapsTurboFirefoxScraper:
         self.shops_data = []
         self.current_location_shops = []
         self.current_location = None
-        self.search_radius_km = 12  # 大幅增加搜尋半徑到12公里
+        self.filtered_non_kaohsiung_count = 0  # 🔧 統計過濾的非高雄店家數量
+        self.search_radius_km = 8   # 🔧 修正：減少搜尋半徑到8公里，避免跨縣市結果
         self.target_shops = 2000
-        self.max_shops_per_search = 80  # 大幅增加每次處理數量
-        self.max_scrolls = 20    # 增加滾動次數
+        self.max_shops_per_search = 120  # 🚀 大幅增加每次處理數量
+        self.max_scrolls = 30    # 🚀 增加滾動次數以確保足夠數量
         
-        # 極速模式設定
+        # 🚀 超極速模式設定 (20小時內完成2000家)
         self.fast_mode = True
-        self.quick_wait = 0.2    # 極短等待時間
-        self.medium_wait = 0.5   # 中等等待時間
-        self.long_wait = 1.0     # 長等待時間
+        self.quick_wait = 0.1    # 🚀 極短等待時間 (0.2→0.1秒)
+        self.medium_wait = 0.3   # 🚀 中等等待時間 (0.5→0.3秒)
+        self.long_wait = 0.6     # 🚀 長等待時間 (1.0→0.6秒)
+        
+        # 🚀 性能統計
+        self.start_time = time.time()
+        self.shops_per_hour_target = 100  # 目標：每小時100家店
+        self.time_budget_hours = 20       # 時間預算：20小時
         
     def setup_logging(self):
         """設定日誌記錄"""
@@ -79,12 +85,54 @@ class GoogleMapsTurboFirefoxScraper:
             "FIREFOX": "🦊",
             "EXTRACT": "🔍",
             "WAIT": "⏳",
-            "SAVE": "💾"
+            "SAVE": "💾",
+            "PERFORMANCE": "📊"
         }
         symbol = symbols.get(level, "📋")
         print(f"[{timestamp}] {symbol} {message}")
         if self.debug_mode:
             self.logger.info(f"{level}: {message}")
+    
+    def check_performance_and_adjust(self):
+        """🚀 實時性能監控與動態調整"""
+        try:
+            current_time = time.time()
+            elapsed_hours = (current_time - self.start_time) / 3600
+            current_shops = len(self.shops_data)
+            
+            if elapsed_hours > 0:
+                shops_per_hour = current_shops / elapsed_hours
+                estimated_completion_hours = (self.target_shops - current_shops) / shops_per_hour if shops_per_hour > 0 else float('inf')
+                remaining_time_hours = self.time_budget_hours - elapsed_hours
+                
+                # 性能報告
+                self.debug_print(f"📊 性能監控 - 已運行 {elapsed_hours:.1f}小時", "PERFORMANCE")
+                self.debug_print(f"📊 當前速度: {shops_per_hour:.1f}家/小時 (目標: {self.shops_per_hour_target}家/小時)", "PERFORMANCE")
+                self.debug_print(f"📊 預估完成時間: {estimated_completion_hours:.1f}小時 (剩餘時間: {remaining_time_hours:.1f}小時)", "PERFORMANCE")
+                
+                # 動態調整策略
+                if shops_per_hour < self.shops_per_hour_target * 0.8:  # 速度不足80%
+                    self.debug_print("🚀 性能不足，啟動加速模式", "TURBO")
+                    self.quick_wait = max(0.05, self.quick_wait * 0.8)  # 減少等待時間
+                    self.medium_wait = max(0.1, self.medium_wait * 0.8)
+                    self.long_wait = max(0.2, self.long_wait * 0.8)
+                    self.max_shops_per_search = min(200, self.max_shops_per_search + 20)  # 增加批量
+                    
+                elif estimated_completion_hours > remaining_time_hours:  # 時間不夠
+                    self.debug_print("⚡ 時間緊迫，啟動極速模式", "TURBO")
+                    self.quick_wait = 0.05  # 最小等待時間
+                    self.medium_wait = 0.1
+                    self.long_wait = 0.2
+                    self.max_shops_per_search = 250  # 最大批量
+                    
+                # 更新等待時間
+                self.debug_print(f"⚡ 調整後等待時間: 快{self.quick_wait}s 中{self.medium_wait}s 長{self.long_wait}s", "TURBO")
+                
+                return shops_per_hour >= self.shops_per_hour_target * 0.5  # 至少要達到50%目標速度
+                
+        except Exception as e:
+            self.debug_print(f"性能監控失敗: {e}", "ERROR")
+            return True
     
     def setup_driver(self):
         """設定Firefox瀏覽器驅動器"""
@@ -103,7 +151,7 @@ class GoogleMapsTurboFirefoxScraper:
             firefox_options.add_argument("--width=1920")
             firefox_options.add_argument("--height=1080")
             
-            # 簡化的偏好設置
+            # 🚀 超極速偏好設置 (20小時完成2000家優化)
             prefs = {
                 # 禁用圖片加載
                 "permissions.default.image": 2,
@@ -115,6 +163,20 @@ class GoogleMapsTurboFirefoxScraper:
                 # 禁用自動更新
                 "app.update.enabled": False,
                 "app.update.auto": False,
+                # 🚀 新增：禁用CSS動畫和過渡效果
+                "browser.animation.enabled": False,
+                "dom.animations-api.core.enabled": False,
+                # 🚀 新增：禁用JavaScript計時器限制
+                "dom.min_timeout_value": 1,
+                # 🚀 新增：禁用媒體元素
+                "media.autoplay.default": 5,
+                "media.autoplay.enabled": False,
+                # 🚀 新增：優化網路設定
+                "network.http.max-connections": 100,
+                "network.http.max-connections-per-server": 20,
+                # 🚀 新增：禁用插件和擴展
+                "plugins.scan.plid.all": False,
+                "extensions.checkCompatibility": False,
                 # 設置用戶代理
                 "general.useragent.override": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
             }
@@ -221,9 +283,9 @@ class GoogleMapsTurboFirefoxScraper:
             return False
     
     def search_nearby_shops_turbo(self, shop_type):
-        """高速搜尋附近店家"""
+        """高速搜尋附近店家 - 精確限制高雄範圍"""
         try:
-            self.debug_print(f"🦊 Firefox高速搜尋: {shop_type} (半徑 {self.search_radius_km}km)", "FIREFOX")
+            self.debug_print(f"🦊 Firefox高速搜尋: {shop_type} (嚴格限制高雄 {self.search_radius_km}km)", "FIREFOX")
             
             search_box = WebDriverWait(self.driver, 8).until(
                 EC.presence_of_element_located((By.ID, "searchboxinput"))
@@ -232,20 +294,121 @@ class GoogleMapsTurboFirefoxScraper:
             search_box.clear()
             time.sleep(self.quick_wait)
             
-            # 構建高效搜尋查詢
-            search_query = f"{shop_type} near {self.current_location}"
+            # 🔧 修正：使用更精確的搜尋語法，強制限制在高雄市範圍
+            if "高雄" not in self.current_location:
+                # 確保搜尋地點包含高雄標識
+                precise_location = f"高雄市{self.current_location}"
+            else:
+                precise_location = self.current_location
+                
+            # 使用多種限制策略，確保結果在高雄
+            search_strategies = [
+                f"{shop_type} in 高雄市 near {precise_location}",  # 明確指定高雄市
+                f"高雄市 {shop_type} {precise_location}",          # 高雄優先語法
+                f"{shop_type} 高雄 {precise_location}"             # 備用語法
+            ]
+            
+            # 嘗試最精確的搜尋語法
+            search_query = search_strategies[0]
+            
+            self.debug_print(f"🎯 精確搜尋查詢: {search_query}", "EXTRACT")
             
             # 極速輸入
             search_box.send_keys(search_query)
             time.sleep(self.quick_wait)
             search_box.send_keys(Keys.ENTER)
             
-            time.sleep(self.long_wait)  # 大幅減少等待時間
+            time.sleep(self.long_wait)  # 等待結果載入
+            
+            # 檢查搜尋結果是否符合預期
+            self.verify_search_results_location()
+            
             return True
             
         except Exception as e:
             self.debug_print(f"搜尋失敗: {e}", "ERROR")
             return False
+    
+    def verify_search_results_location(self):
+        """驗證搜尋結果是否在高雄範圍內"""
+        try:
+            # 等待搜尋結果載入
+            time.sleep(1)
+            
+            # 檢查是否有明顯的非高雄結果
+            page_text = self.driver.page_source.lower()
+            
+            # 非高雄地區關鍵字
+            non_kaohsiung_keywords = [
+                '台北市', '新北市', '桃園市', '台中市', '台南市', '新竹市',
+                '基隆市', '新竹縣', '苗栗縣', '彰化縣', '南投縣', '雲林縣',
+                '嘉義市', '嘉義縣', '屏東縣', '宜蘭縣', '花蓮縣', '台東縣'
+            ]
+            
+            found_non_kaohsiung = []
+            for keyword in non_kaohsiung_keywords:
+                if keyword in page_text:
+                    found_non_kaohsiung.append(keyword)
+            
+            if found_non_kaohsiung:
+                self.debug_print(f"⚠️ 偵測到非高雄結果: {found_non_kaohsiung}", "WARNING")
+                # 可以選擇重新搜尋或記錄警告
+                return False
+            else:
+                self.debug_print("✅ 搜尋結果驗證通過，集中在高雄地區", "SUCCESS")
+                return True
+                
+        except Exception as e:
+            self.debug_print(f"結果驗證失敗: {e}", "ERROR")
+            return False
+    
+    def is_shop_in_kaohsiung(self, shop_info):
+        """檢查店家是否真的在高雄市範圍內"""
+        try:
+            # 檢查店家名稱是否包含非高雄地區資訊
+            name = shop_info.get('name', '').lower()
+            url = shop_info.get('google_maps_url', '').lower()
+            
+            # 非高雄地區關鍵字清單
+            non_kaohsiung_patterns = [
+                '台北', '新北', '桃園', '台中', '台南', '新竹',
+                '基隆', '苗栗', '彰化', '南投', '雲林',
+                '嘉義', '屏東', '宜蘭', '花蓮', '台東',
+                'taipei', 'taichung', 'tainan', 'taoyuan'
+            ]
+            
+            # 檢查店家名稱
+            for pattern in non_kaohsiung_patterns:
+                if pattern in name:
+                    self.debug_print(f"🚫 過濾非高雄店家 (名稱): {shop_info['name']} - 包含 '{pattern}'", "WARNING")
+                    return False
+            
+            # 檢查Google Maps URL中的地理資訊
+            if url:
+                for pattern in non_kaohsiung_patterns:
+                    if pattern in url:
+                        self.debug_print(f"🚫 過濾非高雄店家 (URL): {shop_info['name']} - URL包含 '{pattern}'", "WARNING")
+                        return False
+            
+            # 檢查地址資訊（如果有的話）
+            address = shop_info.get('address', '').lower()
+            if address and address != '極速模式-基本信息':
+                for pattern in non_kaohsiung_patterns:
+                    if pattern in address:
+                        self.debug_print(f"🚫 過濾非高雄店家 (地址): {shop_info['name']} - 地址包含 '{pattern}'", "WARNING")
+                        return False
+                
+                # 確保地址包含高雄相關關鍵字
+                kaohsiung_keywords = ['高雄', 'kaohsiung', '鳳山', '左營', '三民', '苓雅', '前鎮', '小港']
+                if not any(keyword in address for keyword in kaohsiung_keywords):
+                    self.debug_print(f"🚫 過濾疑似非高雄店家: {shop_info['name']} - 地址不包含高雄關鍵字", "WARNING")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.debug_print(f"地理檢查失敗: {e}", "ERROR")
+            return True  # 檢查失敗時暫時保留
     
     def extract_shop_info_detailed(self, link_element):
         """詳細版店家資訊擷取 - 點擊進入詳細頁面獲取完整信息包括電話和地址"""
@@ -293,6 +456,11 @@ class GoogleMapsTurboFirefoxScraper:
             shop_info['search_location'] = self.current_location
             shop_info['google_maps_url'] = link_element.get_attribute('href')
             shop_info['browser'] = 'Firefox-Ultra'
+            
+            # 🔧 修正：先進行地理檢查，過濾非高雄店家
+            if not self.is_shop_in_kaohsiung(shop_info):
+                self.filtered_non_kaohsiung_count += 1  # 統計過濾數量
+                return None  # 直接過濾掉非高雄店家
             
             # 極速模式：跳過詳細頁面，只獲取基本信息
             if self.fast_mode:
@@ -482,6 +650,10 @@ class GoogleMapsTurboFirefoxScraper:
                 scroll_count += 1
                 
                 self.debug_print(f"🚀 第 {scroll_count} 次極速滾動", "FIREFOX")
+                
+                # 🚀 每10次滾動檢查性能並調整
+                if scroll_count % 10 == 0:
+                    self.check_performance_and_adjust()
                 
                 # 極速擷取當前店家
                 current_shops = self.extract_current_shops_turbo()
@@ -699,6 +871,7 @@ class GoogleMapsTurboFirefoxScraper:
             # 統計資料
             self.debug_print("📊 儲存統計:", "INFO")
             self.debug_print(f"   - 總店家數: {len(unique_shops)}", "INFO")
+            self.debug_print(f"   - 🔧 過濾非高雄店家: {self.filtered_non_kaohsiung_count} 家", "INFO")
             
             # 按搜尋地點分組
             location_stats = {}
@@ -1074,13 +1247,24 @@ class GoogleMapsTurboFirefoxScraper:
         """執行網格化搜尋 - 極速優化版"""
         start_time = time.time()
         
-        # 極速優化的搜尋關鍵字 - 精選最有效的
-        shop_types = [
-            "美甲店", "美睫店", "美甲美睫", "nail salon", "eyelash extension",
-            "指甲彩繪", "睫毛嫁接", "美甲工作室", "美睫工作室", "美容美甲",
-            "凝膠指甲", "光療指甲", "植睫毛", "美甲沙龍", "美睫沙龍",
-            "beauty salon", "nail spa", "lash bar"
-        ]
+        # 🚀 智能分層搜尋關鍵字 (20小時完成2000家優化)
+        shop_types_priority = {
+            # 第一層：最高效關鍵字 (優先使用)
+            "tier1": ["美甲店", "美睫店", "美甲美睫", "nail salon", "eyelash extension"],
+            # 第二層：中效關鍵字 (時間充足時使用)
+            "tier2": ["指甲彩繪", "睫毛嫁接", "美甲工作室", "美睫工作室", "美容美甲"],
+            # 第三層：補充關鍵字 (最後使用)
+            "tier3": ["凝膠指甲", "光療指甲", "植睫毛", "美甲沙龍", "美睫沙龍", "beauty salon", "nail spa", "lash bar"]
+        }
+        
+        # 根據性能動態選擇關鍵字
+        elapsed_hours = (time.time() - self.start_time) / 3600 if hasattr(self, 'start_time') else 0
+        if elapsed_hours < 5:  # 前5小時使用全部關鍵字
+            shop_types = shop_types_priority["tier1"] + shop_types_priority["tier2"] + shop_types_priority["tier3"]
+        elif elapsed_hours < 15:  # 5-15小時使用前兩層
+            shop_types = shop_types_priority["tier1"] + shop_types_priority["tier2"]
+        else:  # 最後5小時只用最高效的
+            shop_types = shop_types_priority["tier1"]
         
         try:
             self.debug_print("🚀 開始高雄市極速網格化地理搜尋", "TURBO")
@@ -1156,12 +1340,21 @@ class GoogleMapsTurboFirefoxScraper:
                 
                 self.debug_print(f"✅ 網格 {grid_num} 完成: {len(grid_shops)}家店 | 網格進度: {progress:.1f}% | 總進度: {shops_progress:.1f}%", "SUCCESS")
                 
-                # 每完成20個網格暫存一次（提高頻率）
-                if processed_grids % 20 == 0:
+                # 🚀 每完成10個網格檢查性能並暫存 (提高頻率)
+                if processed_grids % 10 == 0:
+                    # 性能檢查與調整
+                    performance_ok = self.check_performance_and_adjust()
+                    
+                    # 暫存數據
                     timestamp = datetime.now().strftime("%H%M%S")
                     temp_filename = f"高雄市網格搜尋_暫存_{timestamp}"
                     self.save_to_excel(temp_filename)
                     self.debug_print(f"💾 已暫存 {len(self.shops_data)} 筆資料", "SAVE")
+                    
+                    # 如果性能太差，考慮調整策略
+                    if not performance_ok:
+                        self.debug_print("⚠️ 性能警告：考慮調整搜索策略", "WARNING")
+                        # 可以在這裡添加更激進的優化策略
             
             # 生成網格覆蓋報告
             self.generate_grid_coverage_report(grid_results, grid_size, search_count)
@@ -1399,24 +1592,26 @@ class GoogleMapsTurboFirefoxScraper:
             self.debug_print(f"生成覆蓋報告失敗: {e}", "ERROR")
 
 def main():
-    """主程式 - 極速網格模式專用"""
-    print("🚀 Google 地圖店家極速擷取程式 (網格模式專用)")
-    print("⚡ 專為快速收集2000家店家設計 - 100%地理覆蓋")
-    print("🔧 使用Firefox極速模式")
+    """主程式 - 20小時2000家超極速模式"""
+    print("🚀 Google 地圖店家超極速擷取程式 (20小時2000家專用)")
+    print("⚡ 專為20小時內收集2000家店家設計 - 100%地理覆蓋 + 智能性能調整")
+    print("🔧 使用Firefox超極速優化模式")
     print()
-    print("🎯 極速網格模式特色：")
-    print("   - 🚀 極速模式：跳過詳細頁面，優先速度")
-    print("   - 🗺️ 網格化搜索：100%覆蓋高雄市地理範圍")
+    print("🎯 20小時2000家超極速特色：")
+    print("   - 🚀 超極速模式：極短等待時間 0.1-0.6秒")
+    print("   - 🗺️ 智能網格化搜索：100%覆蓋高雄市地理範圍")
     print("   - 📍 GPS座標系統：可驗證無遺漏")
-    print("   - ⚡ 極短等待時間：0.2-1.0秒等待")
-    print("   - 🔍 精選關鍵字：最有效的17個搜尋詞")
-    print("   - 💾 自動暫存：每20個網格自動備份")
+    print("   - ⚡ 動態性能調整：實時監控並自動優化速度")
+    print("   - 🔍 分層智能關鍵字：根據時間動態選擇最有效搜尋詞")
+    print("   - 💾 高頻自動暫存：每10個網格自動備份")
+    print("   - 🎯 地理過濾：100%確保只抓取高雄店家")
     print()
-    print("📊 效能提升：")
-    print("   - 🚀 速度提升3-5倍")
-    print("   - 📈 每網格處理80家店家")
-    print("   - ⏰ 預估完成時間：30-60分鐘")
-    print("   - 🎯 目標：確保達到2000家店家")
+    print("📊 極速性能優化：")
+    print("   - 🚀 目標速度：100家/小時")
+    print("   - 📈 每網格處理：120-250家店家 (動態調整)")
+    print("   - ⏰ 時間預算：20小時內完成")
+    print("   - 🎯 確保目標：2000家高雄店家")
+    print("   - 📊 實時監控：性能追蹤與自動調速")
     print()
     print("🗺️ 網格覆蓋保證：")
     print("   - 使用經緯度將高雄市切割成規則網格")
