@@ -82,52 +82,67 @@ class KaohsiungPrecisionScraper:
             self.logger.info(f"{level}: {message}")
     
     def setup_driver(self):
-        """設定瀏覽器驅動器"""
+        """設定Firefox瀏覽器驅動器"""
         try:
-            self.debug_print("正在設定Firefox瀏覽器...", "INFO")
+            self.debug_print("正在設定Firefox高速瀏覽器...", "INFO")
             firefox_options = Options()
             
-            # Firefox 相關設定
+            # 基本穩定配置
+            if not self.debug_mode:
+                firefox_options.add_argument("--headless")  # 無頭模式更穩定
             firefox_options.add_argument("--no-sandbox")
             firefox_options.add_argument("--disable-dev-shm-usage")
+            firefox_options.add_argument("--disable-gpu")
+            firefox_options.add_argument("--disable-extensions")
+            
+            # 設定窗口大小
             firefox_options.add_argument("--width=1920")
             firefox_options.add_argument("--height=1080")
             
-            # 設定 User Agent
-            firefox_options.set_preference("general.useragent.override", 
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0")
+            # 優化偏好設置
+            prefs = {
+                # 禁用圖片加載（加速）
+                "permissions.default.image": 2,
+                # 禁用通知
+                "dom.webnotifications.enabled": False,
+                "dom.push.enabled": False,
+                # 地理位置設定
+                "geo.enabled": False,
+                # 禁用自動更新
+                "app.update.enabled": False,
+                "app.update.auto": False,
+                # 設置用戶代理
+                "general.useragent.override": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
+            }
             
-            # 禁用自動化檢測
-            firefox_options.set_preference("dom.webdriver.enabled", False)
-            firefox_options.set_preference("useAutomationExtension", False)
+            for key, value in prefs.items():
+                firefox_options.set_preference(key, value)
             
-            # 其他效能設定
-            firefox_options.set_preference("browser.cache.disk.enable", False)
-            firefox_options.set_preference("browser.cache.memory.enable", False)
-            firefox_options.set_preference("browser.cache.offline.enable", False)
-            firefox_options.set_preference("network.http.use-cache", False)
+            # 設定日誌級別
+            firefox_options.log.level = "fatal"
             
-            # 地理位置設定
-            firefox_options.set_preference("geo.enabled", True)
-            firefox_options.set_preference("geo.prompt.testing", True)
-            firefox_options.set_preference("geo.prompt.testing.allow", True)
-            
-            if not self.debug_mode:
-                firefox_options.add_argument("--headless")
-            
+            self.debug_print("🦊 啟動Firefox...", "INFO")
             self.driver = webdriver.Firefox(options=firefox_options)
-            self.driver.maximize_window()
-            
-            # 隱藏 webdriver 屬性
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            self.driver.set_window_size(1920, 1080)
             
             self.debug_print("Firefox瀏覽器設定完成", "SUCCESS")
             return True
             
         except Exception as e:
             self.debug_print(f"Firefox瀏覽器設定失敗: {e}", "ERROR")
-            self.debug_print("請確保已安裝 Firefox 瀏覽器和 geckodriver", "INFO")
-            return False
+            # 嘗試最簡配置
+            try:
+                self.debug_print("🦊 嘗試最簡Firefox配置...", "INFO")
+                simple_options = Options()
+                if not self.debug_mode:
+                    simple_options.add_argument("--headless")
+                self.driver = webdriver.Firefox(options=simple_options)
+                self.debug_print("Firefox簡單配置成功", "SUCCESS")
+                return True
+            except Exception as e2:
+                self.debug_print(f"Firefox簡單配置也失敗: {e2}", "ERROR")
+                self.debug_print("請確保已安裝 Firefox 瀏覽器和 geckodriver", "INFO")
+                return False
     
     def open_google_maps(self):
         """開啟 Google 地圖"""
@@ -135,14 +150,14 @@ class KaohsiungPrecisionScraper:
             self.debug_print("正在開啟 Google 地圖...", "INFO")
             self.driver.get("https://www.google.com/maps")
             
-            WebDriverWait(self.driver, 15).until(
+            WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
             
-            time.sleep(5)
+            time.sleep(3)  # 減少等待時間
             self.handle_consent_popup()
             
-            self.debug_print("Google 地圖載入完成", "SUCCESS")
+            self.debug_print("🚀 Google 地圖載入完成", "SUCCESS")
             return True
             
         except Exception as e:
@@ -152,7 +167,6 @@ class KaohsiungPrecisionScraper:
     def handle_consent_popup(self):
         """處理同意視窗"""
         try:
-            self.debug_print("檢查是否有同意視窗...", "INFO")
             consent_xpaths = [
                 "//button[contains(text(), '接受全部') or contains(text(), 'Accept all')]",
                 "//button[contains(text(), '接受') or contains(text(), 'Accept')]", 
@@ -161,21 +175,19 @@ class KaohsiungPrecisionScraper:
             
             for xpath in consent_xpaths:
                 try:
-                    consent_button = WebDriverWait(self.driver, 2).until(
+                    consent_button = WebDriverWait(self.driver, 1).until(
                         EC.element_to_be_clickable((By.XPATH, xpath))
                     )
                     consent_button.click()
                     self.debug_print("已點擊同意按鈕", "SUCCESS")
-                    time.sleep(2)
+                    time.sleep(1)
                     return True
                 except:
                     continue
                     
-            self.debug_print("未發現同意視窗", "INFO")
             return True
             
         except Exception as e:
-            self.debug_print("同意視窗處理完成", "INFO")
             return True
     
     def set_location(self, location_name):
