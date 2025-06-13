@@ -434,8 +434,8 @@ class KaohsiungPrecisionScraper:
             
             last_count = 0
             no_change_count = 0
-            max_no_change = 3
-            max_scrolls = 8
+            max_no_change = 10      # 超高容忍度：連續20次沒新店家才停止
+            max_scrolls = 200       # 超大滾動次數：每個地點最多200次滾動
             scroll_count = 0
             
             while scroll_count < max_scrolls and no_change_count < max_no_change:
@@ -459,6 +459,7 @@ class KaohsiungPrecisionScraper:
                     return True
                 
                 if no_change_count >= max_no_change:
+                    self.debug_print(f"⚠️ 連續{max_no_change}次沒找到新店家，跳到下個搜索", "WARNING")
                     break
                 
                 # 執行滾動
@@ -510,7 +511,7 @@ class KaohsiungPrecisionScraper:
                     seen_hrefs.add(href)
             
             new_shops = []
-            max_process = min(5, len(unique_links))
+            max_process = len(unique_links)  # 處理所有找到的店家，沒有數量限制
             
             for i, link in enumerate(unique_links[:max_process]):
                 try:
