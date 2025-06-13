@@ -42,6 +42,12 @@ class KaohsiungPrecisionScraper:
         self.shops_data = []
         self.target_shops = 10  # 目標店家數量
         self.search_radius_km = 2  # 搜尋半徑2公里
+        
+        # 🔑 加入成功版本的等待時間設定
+        self.quick_wait = 0.1    # 極短等待時間
+        self.medium_wait = 0.3   # 中等等待時間
+        self.long_wait = 0.6     # 長等待時間
+        
         self.kaohsiung_keywords = [
             '高雄', '鳳山', '左營', '楠梓', '三民', '苓雅', '新興', '前金', 
             '鼓山', '旗津', '前鎮', '小港', '仁武', '大社', '岡山', '路竹',
@@ -87,9 +93,8 @@ class KaohsiungPrecisionScraper:
             self.debug_print("正在設定Firefox高速瀏覽器...", "INFO")
             firefox_options = Options()
             
-            # 基本穩定配置
-            if not self.debug_mode:
-                firefox_options.add_argument("--headless")  # 無頭模式更穩定
+            # 🔑 關鍵：強制無頭模式（與成功版本一致）
+            firefox_options.add_argument("--headless")  # 強制無頭模式更穩定
             firefox_options.add_argument("--no-sandbox")
             firefox_options.add_argument("--disable-dev-shm-usage")
             firefox_options.add_argument("--disable-gpu")
@@ -99,18 +104,32 @@ class KaohsiungPrecisionScraper:
             firefox_options.add_argument("--width=1920")
             firefox_options.add_argument("--height=1080")
             
-            # 優化偏好設置
+            # 🚀 完全複製成功版本的偏好設置
             prefs = {
-                # 禁用圖片加載（加速）
+                # 禁用圖片加載
                 "permissions.default.image": 2,
                 # 禁用通知
                 "dom.webnotifications.enabled": False,
                 "dom.push.enabled": False,
-                # 地理位置設定
+                # 禁用地理位置
                 "geo.enabled": False,
                 # 禁用自動更新
                 "app.update.enabled": False,
                 "app.update.auto": False,
+                # 🚀 新增：禁用CSS動畫和過渡效果
+                "browser.animation.enabled": False,
+                "dom.animations-api.core.enabled": False,
+                # 🚀 新增：禁用JavaScript計時器限制
+                "dom.min_timeout_value": 1,
+                # 🚀 新增：禁用媒體元素
+                "media.autoplay.default": 5,
+                "media.autoplay.enabled": False,
+                # 🚀 新增：優化網路設定
+                "network.http.max-connections": 100,
+                "network.http.max-connections-per-server": 20,
+                # 🚀 新增：禁用插件和擴展
+                "plugins.scan.plid.all": False,
+                "extensions.checkCompatibility": False,
                 # 設置用戶代理
                 "general.useragent.override": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0"
             }
@@ -121,11 +140,11 @@ class KaohsiungPrecisionScraper:
             # 設定日誌級別
             firefox_options.log.level = "fatal"
             
-            self.debug_print("🦊 啟動Firefox...", "INFO")
+            self.debug_print("🦊 啟動Firefox (無頭模式)...", "INFO")
             self.driver = webdriver.Firefox(options=firefox_options)
             self.driver.set_window_size(1920, 1080)
             
-            self.debug_print("Firefox瀏覽器設定完成", "SUCCESS")
+            self.debug_print("Firefox高速瀏覽器設定完成", "SUCCESS")
             return True
             
         except Exception as e:
@@ -134,8 +153,7 @@ class KaohsiungPrecisionScraper:
             try:
                 self.debug_print("🦊 嘗試最簡Firefox配置...", "INFO")
                 simple_options = Options()
-                if not self.debug_mode:
-                    simple_options.add_argument("--headless")
+                simple_options.add_argument("--headless")  # 強制headless
                 self.driver = webdriver.Firefox(options=simple_options)
                 self.debug_print("Firefox簡單配置成功", "SUCCESS")
                 return True
@@ -154,7 +172,7 @@ class KaohsiungPrecisionScraper:
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
             
-            time.sleep(3)  # 減少等待時間
+            time.sleep(self.quick_wait)  # 使用成功版本的等待時間
             self.handle_consent_popup()
             
             self.debug_print("🚀 Google 地圖載入完成", "SUCCESS")
