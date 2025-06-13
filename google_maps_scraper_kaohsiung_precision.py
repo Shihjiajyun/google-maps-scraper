@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-高雄地區美甲美睫店家精準搜索程式
+高雄地區美甲美睫店家精準搜索程式 (Firefox版)
 專門針對高雄地區進行地址驗證的店家資料收集
 目標：收集10家符合條件的店家（美甲、美睫、耳燭、採耳、熱蠟）
+使用Firefox瀏覽器避免Chrome用戶數據目錄衝突問題
 """
 
 import time
@@ -14,7 +15,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 import logging
@@ -82,29 +84,49 @@ class KaohsiungPrecisionScraper:
     def setup_driver(self):
         """設定瀏覽器驅動器"""
         try:
-            self.debug_print("正在設定Chrome瀏覽器...", "INFO")
-            chrome_options = Options()
+            self.debug_print("正在設定Firefox瀏覽器...", "INFO")
+            firefox_options = Options()
             
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            chrome_options.add_experimental_option('useAutomationExtension', False)
-            chrome_options.add_argument("--start-maximized")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            # Firefox 相關設定
+            firefox_options.add_argument("--no-sandbox")
+            firefox_options.add_argument("--disable-dev-shm-usage")
+            firefox_options.add_argument("--width=1920")
+            firefox_options.add_argument("--height=1080")
+            
+            # 設定 User Agent
+            firefox_options.set_preference("general.useragent.override", 
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0")
+            
+            # 禁用自動化檢測
+            firefox_options.set_preference("dom.webdriver.enabled", False)
+            firefox_options.set_preference("useAutomationExtension", False)
+            
+            # 其他效能設定
+            firefox_options.set_preference("browser.cache.disk.enable", False)
+            firefox_options.set_preference("browser.cache.memory.enable", False)
+            firefox_options.set_preference("browser.cache.offline.enable", False)
+            firefox_options.set_preference("network.http.use-cache", False)
+            
+            # 地理位置設定
+            firefox_options.set_preference("geo.enabled", True)
+            firefox_options.set_preference("geo.prompt.testing", True)
+            firefox_options.set_preference("geo.prompt.testing.allow", True)
             
             if not self.debug_mode:
-                chrome_options.add_argument("--headless")
+                firefox_options.add_argument("--headless")
             
-            self.driver = webdriver.Chrome(options=chrome_options)
+            self.driver = webdriver.Firefox(options=firefox_options)
+            self.driver.maximize_window()
+            
+            # 隱藏 webdriver 屬性
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
-            self.debug_print("瀏覽器設定完成", "SUCCESS")
+            self.debug_print("Firefox瀏覽器設定完成", "SUCCESS")
             return True
             
         except Exception as e:
-            self.debug_print(f"瀏覽器設定失敗: {e}", "ERROR")
+            self.debug_print(f"Firefox瀏覽器設定失敗: {e}", "ERROR")
+            self.debug_print("請確保已安裝 Firefox 瀏覽器和 geckodriver", "INFO")
             return False
     
     def open_google_maps(self):
@@ -758,7 +780,7 @@ class KaohsiungPrecisionScraper:
 
 def main():
     """主程式"""
-    print("🚀 高雄地區美甲美睫店家精準搜索程式")
+    print("🚀 高雄地區美甲美睫店家精準搜索程式 (Firefox版)")
     print()
     print("🎯 搜索目標：")
     print("   - 收集10家店家資料")
@@ -772,8 +794,13 @@ def main():
     print("   - 高雄市所有區域重要地標")
     print("   - 地址驗證確保在高雄市")
     print()
-    print("⏰ 預估時間：約6-12小時")
+    print("🦊 瀏覽器：Firefox (避免Chrome衝突)")
+    print("⏰ 預估時間：約30分鐘 (10家店)")
     print("💾 自動儲存Excel和CSV檔案")
+    print()
+    print("📋 系統需求：")
+    print("   - 已安裝 Firefox 瀏覽器")
+    print("   - 已安裝 geckodriver")
     print("-" * 50)
     
     user_input = input("確定要開始搜索嗎？(y/n): ").strip().lower()
