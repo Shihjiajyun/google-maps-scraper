@@ -434,7 +434,7 @@ class KaohsiungPrecisionScraper:
             
             last_count = 0
             no_change_count = 0
-            max_no_change = 10      # 超高容忍度：連續20次沒新店家才停止
+            max_no_change = 10      # 超高容忍度：連續10次沒新店家才停止
             max_scrolls = 200       # 超大滾動次數：每個地點最多200次滾動
             scroll_count = 0
             
