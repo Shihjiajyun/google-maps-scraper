@@ -3,7 +3,7 @@
 """
 高雄地區美甲美睫店家精準搜索程式 (Firefox版)
 專門針對高雄地區進行地址驗證的店家資料收集
-目標：收集10家符合條件的店家（美甲、美睫、耳燭、採耳、熱蠟）
+目標：收集2000家符合條件的店家（美甲、美睫、耳燭、採耳、熱蠟）
 使用Firefox瀏覽器避免Chrome用戶數據目錄衝突問題
 """
 
@@ -40,7 +40,7 @@ class KaohsiungPrecisionScraper:
         self.setup_logging()
         self.driver = None
         self.shops_data = []
-        self.target_shops = 10  # 目標店家數量
+        self.target_shops = 2000  # 目標店家數量
         self.search_radius_km = 2  # 搜尋半徑2公里
         
         # 🔑 加入成功版本的等待時間設定
@@ -813,7 +813,7 @@ def main():
     print("🚀 高雄地區美甲美睫店家精準搜索程式 (Firefox版)")
     print()
     print("🎯 搜索目標：")
-    print("   - 收集10家店家資料")
+    print("   - 收集2000家店家資料")
     print("   - 店家名稱、地圖連結、地址、電話")
     print("   - 確保地址在高雄市")
     print()
@@ -825,7 +825,7 @@ def main():
     print("   - 地址驗證確保在高雄市")
     print()
     print("🦊 瀏覽器：Firefox (避免Chrome衝突)")
-    print("⏰ 預估時間：約30分鐘 (10家店)")
+    print("⏰ 預估時間：約30分鐘 (2000家店)")
     print("💾 自動儲存Excel和CSV檔案")
     print()
     print("📋 系統需求：")
