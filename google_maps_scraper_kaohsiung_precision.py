@@ -44,6 +44,12 @@ class KaohsiungPrecisionScraper:
         self.target_shops = 2000  # 目標店家數量
         self.search_radius_km = 2  # 搜尋半徑2公里
         
+        # 🔑 新增：追蹤已處理的店家，避免重複抓取
+        self.processed_shop_urls = set()  # 已處理的店家URL
+        self.processed_shop_names = set()  # 已處理的店家名稱
+        self.current_scroll_position = 0  # 當前滾動位置
+        self.last_processed_index = -1   # 最後處理的店家索引
+        
         # 🔑 加入成功版本的等待時間設定
         self.quick_wait = 0.1    # 極短等待時間
         self.medium_wait = 0.3   # 中等等待時間
@@ -915,6 +921,18 @@ class KaohsiungPrecisionScraper:
         
         return False
     
+    def reset_tracking_for_new_location(self):
+        """為新地標重置追蹤狀態"""
+        try:
+            self.debug_print("🔄 重置地標追蹤狀態...", "INFO")
+            # 不清空已處理的URL和名稱，保持全局去重
+            # 但重置索引位置，讓每個地標都從頭開始
+            self.last_processed_index = -1
+            self.current_scroll_position = 0
+            self.debug_print("✅ 追蹤狀態已重置", "SUCCESS")
+        except Exception as e:
+            self.debug_print(f"重置追蹤狀態失敗: {e}", "WARNING")
+
     def scroll_and_extract(self):
         """滾動並擷取店家資訊 - 改良版，詳細監控"""
         try:
@@ -1161,141 +1179,247 @@ class KaohsiungPrecisionScraper:
             self.debug_print(f"頁面滾動失敗: {e}", "WARNING")
 
     def extract_current_shops(self):
-        """擷取當前可見的店家 - 改良版"""
+        """擷取當前可見的店家 - 精確追蹤版，避免重複和跳過"""
         try:
-            # 更全面的店家選擇器
-            shop_selectors = [
-                # 主要的店家連結
-                "a[href*='/maps/place/']",
-                "a[data-value='directions' i]",
-                "a[href*='place_id']",
-                
-                # 各種可能的店家容器
-                "div[role='article'] a",
-                "div[jsaction*='click'] a[href*='place']", 
-                "div[data-result-index] a",
-                "[data-result-ad-index] a",
-                
-                # 新版Google Maps選擇器
-                "div[role='feed'] a",
-                "div[role='region'] a[href*='place']",
-                "[jsaction*='mouseover'] a[href*='maps']",
-                
-                # 備用選擇器
-                "a[aria-label][href*='place']",
-                "a[data-cid] ",
-                "div[data-header] a"
-            ]
+            self.debug_print("🔍 開始精確擷取店家（避免重複/跳過）...", "INFO")
             
-            all_shop_links = []
-            total_found = 0
+            # 保存當前滾動位置
+            try:
+                container = self.find_scrollable_container()
+                if container:
+                    current_scroll = self.driver.execute_script("return arguments[0].scrollTop", container)
+                    self.debug_print(f"📏 當前滾動位置: {current_scroll}px", "INFO")
+                else:
+                    current_scroll = self.driver.execute_script("return window.pageYOffset")
+                    self.debug_print(f"📏 當前頁面滾動位置: {current_scroll}px", "INFO")
+            except:
+                current_scroll = 0
             
-            for i, selector in enumerate(shop_selectors):
-                try:
-                    links = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    valid_links = []
-                    
-                    for link in links:
-                        href = link.get_attribute('href')
-                        if href and ('/maps/place/' in href or 'place_id=' in href):
-                            valid_links.append(link)
-                    
-                    all_shop_links.extend(valid_links)
-                    total_found += len(valid_links)
-                    
-                    if len(valid_links) > 0:
-                        self.debug_print(f"選擇器 {i+1} 找到 {len(valid_links)} 個店家連結", "INFO")
-                        
-                except Exception as e:
-                    self.debug_print(f"選擇器 {i+1} 失敗: {e}", "WARNING")
-                    continue
+            # 獲取所有店家連結
+            all_shop_links = self.get_all_visible_shop_links()
             
-            self.debug_print(f"總共找到 {total_found} 個店家連結", "INFO")
+            if not all_shop_links:
+                self.debug_print("⚠️ 未找到任何店家連結", "WARNING")
+                return []
             
-            # 去除重複連結
-            unique_links = []
-            seen_hrefs = set()
+            self.debug_print(f"📊 找到 {len(all_shop_links)} 個店家連結", "INFO")
             
-            for link in all_shop_links:
-                try:
-                    href = link.get_attribute('href')
-                    if href and href not in seen_hrefs:
-                        # 提取place_id或地點名稱作為唯一標識
-                        place_id = self.extract_place_identifier(href)
-                        if place_id and place_id not in seen_hrefs:
-                            unique_links.append(link)
-                            seen_hrefs.add(href)
-                            seen_hrefs.add(place_id)
-                except:
-                    continue
-            
-            self.debug_print(f"去重後剩餘 {len(unique_links)} 個獨特店家", "INFO")
-            
+            # 🔑 關鍵：從上次處理的位置繼續，避免重複
+            start_index = self.last_processed_index + 1
             new_shops = []
-            processed_count = 0
-            max_process_per_round = min(50, len(unique_links))  # 每輪最多處理50家
+            processed_in_this_round = 0
+            max_process_per_round = 10  # 減少每輪處理數量，提高穩定性
             
-            for i, link in enumerate(unique_links[:max_process_per_round]):
+            self.debug_print(f"🎯 從索引 {start_index} 開始處理（上次處理到 {self.last_processed_index}）", "INFO")
+            
+            # 處理新的店家
+            for i in range(start_index, min(start_index + max_process_per_round, len(all_shop_links))):
                 try:
-                    processed_count += 1
+                    link = all_shop_links[i]
+                    processed_in_this_round += 1
                     
-                    # 滾動到元素位置
-                    try:
-                        self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", link)
-                        time.sleep(0.8)
-                    except:
-                        pass
+                    # 檢查是否已經處理過
+                    href = link.get_attribute('href') or ''
+                    if href in self.processed_shop_urls:
+                        self.debug_print(f"⏭️ 跳過已處理店家 {i+1}: {href[:50]}...", "INFO")
+                        self.last_processed_index = i
+                        continue
                     
-                    shop_info = self.extract_shop_info(link)
-                    if shop_info and self.is_new_shop(shop_info):
-                        self.shops_data.append(shop_info)
-                        new_shops.append(shop_info)
-                        self.debug_print(f"✅ 新增店家: {shop_info['name']}", "SUCCESS")
-                        self.debug_print(f"   📍 地址: {shop_info['address'][:60]}...", "INFO")
-                        self.debug_print(f"   📞 電話: {shop_info['phone']}", "INFO")
-                        self.debug_print(f"📊 進度: {len(self.shops_data)}/{self.target_shops} ({processed_count}/{max_process_per_round})", "INFO")
-                        
-                        # 檢查是否達到目標
-                        if len(self.shops_data) >= self.target_shops:
-                            self.debug_print(f"🎯 達到{self.target_shops}家目標！", "TARGET")
-                            break
+                    # 🔑 關鍵：確保元素可見並滾動到合適位置
+                    self.ensure_element_visible(link, i)
+                    
+                    # 提取店家資訊
+                    self.debug_print(f"🔍 處理店家 {i+1}/{len(all_shop_links)}", "INFO")
+                    shop_info = self.extract_shop_info_safe(link, i)
+                    
+                    if shop_info:
+                        # 檢查是否為新店家
+                        if self.is_truly_new_shop(shop_info):
+                            self.shops_data.append(shop_info)
+                            new_shops.append(shop_info)
+                            
+                            # 記錄已處理
+                            self.processed_shop_urls.add(href)
+                            self.processed_shop_names.add(shop_info['name'].lower().strip())
+                            self.last_processed_index = i
+                            
+                            self.debug_print(f"✅ 新增店家 {len(self.shops_data)}: {shop_info['name']}", "SUCCESS")
+                            self.debug_print(f"   📍 地址: {shop_info['address'][:50]}...", "INFO")
+                            self.debug_print(f"   📞 電話: {shop_info['phone']}", "INFO")
+                            self.debug_print(f"   📱 LINE: {shop_info['line_contact']}", "INFO")
+                            
+                            # 檢查是否達到目標
+                            if len(self.shops_data) >= self.target_shops:
+                                self.debug_print(f"🎯 達到{self.target_shops}家目標！", "TARGET")
+                                break
+                        else:
+                            self.debug_print(f"⚠️ 重複店家: {shop_info.get('name', '未知')}", "WARNING")
+                            self.processed_shop_urls.add(href)
+                            self.last_processed_index = i
                     else:
-                        if shop_info:
-                            self.debug_print(f"⚠️ 重複或無效店家: {shop_info.get('name', '未知')}", "WARNING")
+                        self.debug_print(f"❌ 店家 {i+1} 資訊提取失敗", "ERROR")
+                        self.last_processed_index = i
                         
                 except Exception as e:
-                    self.debug_print(f"處理店家 {i+1} 時出錯: {e}", "ERROR")
+                    self.debug_print(f"❌ 處理店家 {i+1} 時出錯: {e}", "ERROR")
+                    self.last_processed_index = i
                     continue
             
-            self.debug_print(f"本輪成功新增 {len(new_shops)} 家店", "SUCCESS")
+            # 恢復滾動位置到左側搜尋結果
+            self.restore_search_scroll_position(container, current_scroll)
+            
+            self.debug_print(f"📊 本輪處理結果:", "SUCCESS")
+            self.debug_print(f"   🔍 檢查了 {processed_in_this_round} 家店", "INFO")
+            self.debug_print(f"   ✅ 新增了 {len(new_shops)} 家店", "INFO")
+            self.debug_print(f"   📈 總計 {len(self.shops_data)} 家店", "INFO")
+            self.debug_print(f"   📍 下次從索引 {self.last_processed_index + 1} 開始", "INFO")
+            
             return new_shops
             
         except Exception as e:
-            self.debug_print(f"擷取店家錯誤: {e}", "ERROR")
+            self.debug_print(f"❌ 擷取店家錯誤: {e}", "ERROR")
             return []
     
-    def extract_place_identifier(self, href):
-        """從URL中提取地點標識符"""
+    def get_all_visible_shop_links(self):
+        """獲取所有可見的店家連結"""
         try:
-            if 'place_id=' in href:
-                # 提取place_id
-                import re
-                match = re.search(r'place_id=([^&]+)', href)
-                if match:
-                    return f"place_id_{match.group(1)}"
+            # 更精確的店家選擇器
+            shop_selectors = [
+                "a[href*='/maps/place/']",
+                "a[href*='place_id']",
+                "div[role='article'] a",
+                "div[jsaction*='click'] a[href*='place']",
+                "div[role='feed'] a",
+                "a[aria-label][href*='place']"
+            ]
             
-            if '/maps/place/' in href:
-                # 提取地點名稱
-                parts = href.split('/maps/place/')
-                if len(parts) > 1:
-                    place_part = parts[1].split('/')[0]
-                    return urllib.parse.unquote(place_part)
+            all_links = []
+            seen_hrefs = set()
             
-            return href
+            for selector in shop_selectors:
+                try:
+                    links = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for link in links:
+                        href = link.get_attribute('href')
+                        if href and ('/maps/place/' in href or 'place_id=' in href) and href not in seen_hrefs:
+                            all_links.append(link)
+                            seen_hrefs.add(href)
+                except:
+                    continue
+            
+            # 按照在頁面上的位置排序
+            try:
+                all_links.sort(key=lambda x: x.location['y'])
+            except:
+                pass
+            
+            return all_links
             
         except Exception as e:
-            return href
-
+            self.debug_print(f"獲取店家連結失敗: {e}", "ERROR")
+            return []
+    
+    def ensure_element_visible(self, element, index):
+        """確保元素可見，並滾動到合適位置"""
+        try:
+            # 檢查元素是否在視窗內
+            is_visible = self.driver.execute_script("""
+                var rect = arguments[0].getBoundingClientRect();
+                return (rect.top >= 0 && rect.left >= 0 && 
+                        rect.bottom <= window.innerHeight && 
+                        rect.right <= window.innerWidth);
+            """, element)
+            
+            if not is_visible:
+                self.debug_print(f"📱 元素 {index+1} 不可見，滾動到視窗中央", "INFO")
+                self.driver.execute_script("""
+                    arguments[0].scrollIntoView({
+                        behavior: 'smooth', 
+                        block: 'center',
+                        inline: 'nearest'
+                    });
+                """, element)
+                time.sleep(1)  # 等待滾動完成
+            
+        except Exception as e:
+            self.debug_print(f"確保元素可見失敗: {e}", "WARNING")
+    
+    def extract_shop_info_safe(self, link_element, index):
+        """安全地提取店家資訊，包含錯誤恢復"""
+        try:
+            # 記錄當前滾動位置
+            container = self.find_scrollable_container()
+            if container:
+                scroll_backup = self.driver.execute_script("return arguments[0].scrollTop", container)
+            else:
+                scroll_backup = self.driver.execute_script("return window.pageYOffset")
+            
+            # 提取店家資訊
+            shop_info = self.extract_shop_info(link_element)
+            
+            # 恢復滾動位置
+            if container:
+                self.driver.execute_script("arguments[0].scrollTop = arguments[1]", container, scroll_backup)
+            else:
+                self.driver.execute_script("window.scrollTo(0, arguments[0])", scroll_backup)
+            
+            return shop_info
+            
+        except Exception as e:
+            self.debug_print(f"安全提取店家 {index+1} 資訊失敗: {e}", "ERROR")
+            # 嘗試恢復到搜尋頁面
+            try:
+                self.driver.back()
+                time.sleep(2)
+            except:
+                pass
+            return None
+    
+    def is_truly_new_shop(self, shop_info):
+        """更嚴格的新店家檢查"""
+        if not shop_info or not shop_info.get('name'):
+            return False
+        
+        shop_name = shop_info['name'].strip().lower()
+        shop_url = shop_info.get('google_maps_url', '').strip()
+        
+        # 檢查URL是否已處理
+        if shop_url in self.processed_shop_urls:
+            return False
+        
+        # 檢查名稱是否已處理
+        if shop_name in self.processed_shop_names:
+            return False
+        
+        # 檢查現有資料中是否有重複
+        for existing_shop in self.shops_data:
+            existing_name = existing_shop.get('name', '').strip().lower()
+            existing_url = existing_shop.get('google_maps_url', '').strip()
+            
+            if existing_name == shop_name or existing_url == shop_url:
+                return False
+        
+        return True
+    
+    def restore_search_scroll_position(self, container, target_position):
+        """恢復搜尋結果的滾動位置"""
+        try:
+            if container:
+                current_position = self.driver.execute_script("return arguments[0].scrollTop", container)
+                if abs(current_position - target_position) > 50:  # 如果位置差異超過50px
+                    self.debug_print(f"🔄 恢復滾動位置: {current_position}px → {target_position}px", "INFO")
+                    self.driver.execute_script("arguments[0].scrollTop = arguments[1]", container, target_position)
+                    time.sleep(1)
+            else:
+                current_position = self.driver.execute_script("return window.pageYOffset")
+                if abs(current_position - target_position) > 50:
+                    self.debug_print(f"🔄 恢復頁面滾動位置: {current_position}px → {target_position}px", "INFO")
+                    self.driver.execute_script("window.scrollTo(0, arguments[0])", target_position)
+                    time.sleep(1)
+                    
+        except Exception as e:
+            self.debug_print(f"恢復滾動位置失敗: {e}", "WARNING")
+    
     def find_scrollable_container(self):
         """找到可滾動的容器 - 改良版"""
         try:
@@ -1346,27 +1470,7 @@ class KaohsiungPrecisionScraper:
             self.debug_print(f"找不到滾動容器: {e}", "ERROR")
             return None
     
-    def is_new_shop(self, shop_info):
-        """檢查是否為新店家"""
-        if not shop_info or not shop_info.get('name'):
-            return False
-            
-        shop_name = shop_info['name'].strip().lower()
-        shop_url = shop_info.get('google_maps_url', '').strip()
-        
-        for existing_shop in self.shops_data:
-            existing_name = existing_shop.get('name', '').strip().lower()
-            existing_url = existing_shop.get('google_maps_url', '').strip()
-            
-            # 名稱匹配
-            if existing_name == shop_name:
-                return False
-            
-            # URL匹配
-            if shop_url and existing_url and shop_url == existing_url:
-                return False
-        
-        return True
+
     
     def save_to_excel(self, filename=None):
         """儲存資料到Excel檔案"""
@@ -1587,6 +1691,9 @@ class KaohsiungPrecisionScraper:
             # 對每個地標進行搜索
             for i, landmark in enumerate(selected_landmarks, 1):
                 self.debug_print(f"[{i}/{len(selected_landmarks)}] 🗺️ 地標: {landmark}", "INFO")
+                
+                # 🔑 關鍵：為新地標重置追蹤狀態，避免重複抓取
+                self.reset_tracking_for_new_location()
                 
                 if not self.set_location(landmark):
                     self.debug_print(f"❌ 無法定位到 {landmark}，跳過", "WARNING")
