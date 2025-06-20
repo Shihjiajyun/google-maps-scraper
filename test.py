@@ -1,9 +1,15 @@
 import requests
 import time
 import csv
+import os
+from dotenv import load_dotenv
 
-# ✅ 1. 替換成你的 API 金鑰
-API_KEY = 'AIzaSyAZFe8w46c7s2Nw_YWprPdIeEx5lB1FfCI'
+# ✅ 1. 從環境變數讀取 API 金鑰
+load_dotenv()
+API_KEY = os.getenv('API_KEY')
+
+if not API_KEY:
+    raise ValueError("請在 .env 檔案中設定 API_KEY")
 
 # ✅ 2. 高雄行政區＋中心座標（可擴充）
 area_keywords = [
