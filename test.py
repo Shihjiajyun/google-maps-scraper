@@ -2,14 +2,43 @@ import requests
 import time
 import csv
 import os
+import re
 from dotenv import load_dotenv
 
 # ✅ 1. 從環境變數讀取 API 金鑰
-load_dotenv()
-API_KEY = os.getenv('API_KEY')
+try:
+    load_dotenv()
+    API_KEY = os.getenv('API_KEY')
+except UnicodeDecodeError:
+    print("❌ .env 檔案編碼錯誤，請確保檔案使用 UTF-8 編碼")
+    print("💡 解決方案：")
+    print("   1. 刪除現有的 .env 檔案")
+    print("   2. 建立新的 .env 檔案，內容如下：")
+    print("   API_KEY=您的Google_Places_API_Key")
+    print("   3. 確保檔案保存為 UTF-8 編碼")
+    exit(1)
+except Exception as e:
+    print(f"❌ 載入 .env 檔案時發生錯誤：{e}")
+    exit(1)
 
 if not API_KEY:
-    raise ValueError("請在 .env 檔案中設定 API_KEY")
+    print("❌ 未找到 API_KEY")
+    print("💡 請建立 .env 檔案，內容如下：")
+    print("API_KEY=您的Google_Places_API_Key")
+    
+    # 嘗試建立 .env 檔案模板
+    try:
+        with open('.env', 'w', encoding='utf-8') as f:
+            f.write('# Google Places API 金鑰\n')
+            f.write('# 請將下面的 YOUR_API_KEY_HERE 替換為您的實際 API 金鑰\n')
+            f.write('API_KEY=YOUR_API_KEY_HERE\n')
+        print("✅ 已建立 .env 檔案模板，請編輯並填入您的 API 金鑰")
+    except Exception as e:
+        print(f"❌ 無法建立 .env 檔案：{e}")
+    
+    exit(1)
+
+print(f"✅ API 金鑰載入成功：{API_KEY[:10]}...")
 
 # ✅ 2. 高雄行政區＋中心座標（可擴充）
 area_keywords = [
@@ -52,8 +81,32 @@ area_keywords = [
     ("茂林區", "22.8937,120.6592")
 ]
 
+# ✅ 3. 提取LINE聯絡方式的函數
+def extract_line_contact(text):
+    """從文字中提取LINE聯絡方式"""
+    if not text:
+        return 'N/A'
+    
+    # 常見的LINE ID格式
+    line_patterns = [
+        r'line[：:]\s*@?([a-zA-Z0-9_.-]+)',
+        r'line\s*id[：:]\s*@?([a-zA-Z0-9_.-]+)',
+        r'@([a-zA-Z0-9_.-]+)',
+        r'line[：:]\s*([a-zA-Z0-9_.-]+)',
+        r'加line[：:]\s*@?([a-zA-Z0-9_.-]+)',
+        r'加入line[：:]\s*@?([a-zA-Z0-9_.-]+)'
+    ]
+    
+    text_lower = text.lower()
+    for pattern in line_patterns:
+        match = re.search(pattern, text_lower, re.IGNORECASE)
+        if match:
+            line_id = match.group(1)
+            return f"@{line_id}" if not line_id.startswith('@') else line_id
+    
+    return 'N/A'
 
-# ✅ 3. 搜尋附近店家（最多 60 筆）
+# ✅ 4. 搜尋附近店家（最多 60 筆）
 def search_places(keyword, location, radius):
     url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
     params = {
@@ -77,19 +130,19 @@ def search_places(keyword, location, radius):
             break
     return results
 
-# ✅ 4. 取得店家詳細資訊（含電話）
+# ✅ 5. 取得店家詳細資訊（含電話、網站、評論等）
 def get_place_details(place_id):
     url = 'https://maps.googleapis.com/maps/api/place/details/json'
     params = {
         'key': API_KEY,
         'place_id': place_id,
         'language': 'zh-TW',
-        'fields': 'name,formatted_address,formatted_phone_number'
+        'fields': 'name,formatted_address,formatted_phone_number,website,reviews,editorial_summary'
     }
     res = requests.get(url, params=params).json()
     return res.get('result', {})
 
-# ✅ 5. 主程式：遍歷所有區域並輸出店家資訊
+# ✅ 6. 主程式：遍歷所有區域並輸出店家資訊
 def run_search_all_areas(keyword="美甲", radius=5000):
     all_results = []
 
@@ -103,20 +156,55 @@ def run_search_all_areas(keyword="美甲", radius=5000):
                 name = place.get('name')
                 address = place.get('vicinity')
                 place_id = place.get('place_id')
+                
+                # 取得詳細資訊
                 details = get_place_details(place_id)
                 phone = details.get('formatted_phone_number', 'N/A')
-                maps_url = f"https://www.google.com/maps/place/?q=place_id={place_id}"
+                website = details.get('website', '')
+                
+                # 修正Google Maps連結格式
+                maps_url = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
+                
+                # 搜尋LINE聯絡方式
+                line_contact = 'N/A'
+                
+                # 從網站連結查找LINE
+                if website and 'line' in website.lower():
+                    line_contact = extract_line_contact(website)
+                
+                # 從評論中搜尋LINE資訊
+                if line_contact == 'N/A' and details.get('reviews'):
+                    for review in details.get('reviews', [])[:5]:  # 只檢查前5個評論
+                        review_text = review.get('text', '')
+                        extracted_line = extract_line_contact(review_text)
+                        if extracted_line != 'N/A':
+                            line_contact = extracted_line
+                            break
+                
+                # 從編輯摘要搜尋LINE資訊
+                if line_contact == 'N/A' and details.get('editorial_summary'):
+                    summary_text = details.get('editorial_summary', {}).get('overview', '')
+                    line_contact = extract_line_contact(summary_text)
 
                 result = {
                     '區域': area_name,
                     '店名': name,
                     '地址': address,
                     '電話': phone,
+                    'LINE聯絡方式': line_contact,
+                    '網站': website if website else 'N/A',
                     '地圖連結': maps_url
                 }
                 all_results.append(result)
 
-                print(f"✅ {name}\n地址：{address}\n電話：{phone}\n地圖：{maps_url}\n---")
+                print(f"✅ {name}")
+                print(f"地址：{address}")
+                print(f"電話：{phone}")
+                print(f"LINE：{line_contact}")
+                print(f"網站：{website if website else 'N/A'}")
+                print(f"地圖：{maps_url}")
+                print("---")
+                
                 time.sleep(1)
             except Exception as e:
                 print(f"❌ 發生錯誤：{e}")
@@ -125,15 +213,15 @@ def run_search_all_areas(keyword="美甲", radius=5000):
     print(f"\n✅ 全部完成，共 {len(all_results)} 筆店家資料")
     return all_results
 
-# ✅ 6. 將結果寫入 CSV 檔案
+# ✅ 7. 將結果寫入 CSV 檔案
 def save_to_csv(data, filename="kaohsiung_nail_shops.csv"):
     with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['區域', '店名', '地址', '電話', '地圖連結'])
+        writer = csv.DictWriter(f, fieldnames=['區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
         writer.writeheader()
         writer.writerows(data)
     print(f"\n📁 成功輸出至 CSV 檔案：{filename}")
 
-# ✅ 7. 執行主流程
+# ✅ 8. 執行主流程
 if __name__ == '__main__':
     data = run_search_all_areas()
     save_to_csv(data)
