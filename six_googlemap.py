@@ -3,6 +3,8 @@ import time
 import csv
 import os
 import re
+import logging
+from datetime import datetime
 from dotenv import load_dotenv
 
 # ✅ 1. 從環境變數讀取 API 金鑰
@@ -39,6 +41,38 @@ if not API_KEY:
     exit(1)
 
 print(f"✅ API 金鑰載入成功：{API_KEY[:10]}...")
+
+# ✅ 1.5. 設定 Log 記錄
+def setup_logging():
+    """設定 log 檔案和格式"""
+    # 建立 logs 目錄
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    # 建立時間戳記的檔案名稱
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = f"logs/beauty_scraper_{timestamp}.log"
+    
+    # 設定 logging 格式
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_filename, encoding='utf-8'),
+            logging.StreamHandler()  # 同時輸出到控制台
+        ]
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 60)
+    logger.info("🚀 開始執行美容店家搜尋程式")
+    logger.info(f"📁 Log 檔案：{log_filename}")
+    logger.info("=" * 60)
+    
+    return logger
+
+# 初始化 logger
+logger = setup_logging()
 
 # ✅ 2. 台灣六都 + 屏東所有行政區中心座標
 area_keywords = [
@@ -326,22 +360,35 @@ def search_places_comprehensive(keywords, location, radius):
     all_results = []
     
     for keyword in keywords:
+        logger.info(f"   🔎 搜尋關鍵字：{keyword}")
         print(f"   🔎 搜尋關鍵字：{keyword}")
         
         # 方法1: NearbySearch
-        nearby_results = search_places_nearby(keyword, location, radius)
-        all_results.extend(nearby_results)
-        time.sleep(1)
+        try:
+            nearby_results = search_places_nearby(keyword, location, radius)
+            all_results.extend(nearby_results)
+            logger.info(f"      NearbySearch 找到 {len(nearby_results)} 筆")
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f"      NearbySearch 失敗：{e}")
         
         # 方法2: TextSearch (更廣泛)
-        text_results = search_places_text(keyword, location, radius)
-        all_results.extend(text_results)
-        time.sleep(1)
+        try:
+            text_results = search_places_text(keyword, location, radius)
+            all_results.extend(text_results)
+            logger.info(f"      TextSearch 找到 {len(text_results)} 筆")
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f"      TextSearch 失敗：{e}")
         
         # 方法3: 加上類別搜尋
-        category_results = search_places_nearby(f"{keyword} 美容", location, radius)
-        all_results.extend(category_results)
-        time.sleep(1)
+        try:
+            category_results = search_places_nearby(f"{keyword} 美容", location, radius)
+            all_results.extend(category_results)
+            logger.info(f"      類別搜尋 找到 {len(category_results)} 筆")
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f"      類別搜尋 失敗：{e}")
     
     return all_results
 
@@ -385,18 +432,29 @@ def run_search_all_areas(keywords=None, radius=8000):
     all_results = []
     total_areas = len(area_keywords)
     
+    logger.info(f"🎯 搜尋關鍵字：{', '.join(keywords)}")
+    logger.info(f"📏 搜尋半徑：{radius} 公尺")
+    logger.info(f"📊 總共需要搜尋 {total_areas} 個行政區")
+    
     print(f"🎯 搜尋關鍵字：{', '.join(keywords)}")
     print(f"📏 搜尋半徑：{radius} 公尺")
     
     for index, (area_name, center, city) in enumerate(area_keywords, 1):
-        print(f"🔍 搜尋區域：{city} {area_name} ({index}/{total_areas})")
+        region_info = f"{city} {area_name} ({index}/{total_areas})"
+        logger.info(f"🔍 開始搜尋區域：{region_info}")
+        print(f"🔍 搜尋區域：{region_info}")
         
         # 使用綜合搜尋策略
+        start_time = time.time()
         places = search_places_comprehensive(keywords, center, radius)
+        search_time = time.time() - start_time
         
         # 去除重複
         unique_places = deduplicate_places(places)
-        print(f"找到 {len(places)} 間店家，去重後 {len(unique_places)} 間")
+        
+        result_info = f"找到 {len(places)} 間店家，去重後 {len(unique_places)} 間，耗時 {search_time:.1f} 秒"
+        logger.info(f"✅ {region_info} - {result_info}")
+        print(result_info)
 
         for place in unique_places:
             try:
@@ -445,6 +503,9 @@ def run_search_all_areas(keywords=None, radius=8000):
                 }
                 all_results.append(result)
 
+                # 記錄店家資訊到 log
+                logger.info(f"   📍 {name} | {address} | {phone} | LINE: {line_contact}")
+                
                 print(f"✅ {name}")
                 print(f"地址：{address}")
                 print(f"電話：{phone}")
@@ -455,11 +516,15 @@ def run_search_all_areas(keywords=None, radius=8000):
                 
                 time.sleep(1)
             except Exception as e:
-                print(f"❌ 發生錯誤：{e}")
+                error_msg = f"處理店家時發生錯誤：{e}"
+                logger.error(f"❌ {error_msg}")
+                print(f"❌ {error_msg}")
                 continue
 
     # 最終全域去重
+    logger.info("\n🔄 開始進行最終去重處理...")
     print("\n🔄 進行最終去重處理...")
+    
     final_results = []
     seen_places = set()
     
@@ -471,6 +536,10 @@ def run_search_all_areas(keywords=None, radius=8000):
             final_results.append(result)
     
     removed_count = len(all_results) - len(final_results)
+    
+    logger.info(f"✅ 去重完成：原有 {len(all_results)} 筆，去除 {removed_count} 筆重複，最終 {len(final_results)} 筆")
+    logger.info("🎉 搜尋程序完成！")
+    
     print(f"✅ 去除 {removed_count} 筆重複資料")
     print(f"🎉 最終完成，共 {len(final_results)} 筆店家資料")
     
@@ -478,11 +547,19 @@ def run_search_all_areas(keywords=None, radius=8000):
 
 # ✅ 8. 將結果寫入 CSV 檔案
 def save_to_csv(data, filename="taiwan_six_cities_beauty_shops.csv"):
-    with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['縣市', '區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
-        writer.writeheader()
-        writer.writerows(data)
-    print(f"\n📁 成功輸出至 CSV 檔案：{filename}")
+    try:
+        with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=['縣市', '區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
+            writer.writeheader()
+            writer.writerows(data)
+        
+        logger.info(f"📁 CSV 檔案保存成功：{filename}")
+        logger.info(f"📊 總計匯出 {len(data)} 筆店家資料")
+        print(f"\n📁 成功輸出至 CSV 檔案：{filename}")
+        
+    except Exception as e:
+        logger.error(f"❌ CSV 檔案保存失敗：{e}")
+        print(f"❌ CSV 檔案保存失敗：{e}")
 
 # ✅ 9. 執行主流程
 if __name__ == '__main__':
@@ -503,6 +580,14 @@ if __name__ == '__main__':
             city = item['縣市']
             city_stats[city] = city_stats.get(city, 0) + 1
         
+        logger.info("\n📈 各縣市店家統計結果：")
         print("\n📈 各縣市店家統計：")
+        
         for city, count in city_stats.items():
-            print(f"   {city}：{count} 間店家")
+            stat_info = f"{city}：{count} 間店家"
+            logger.info(f"   {stat_info}")
+            print(f"   {stat_info}")
+        
+        logger.info("=" * 60)
+        logger.info("🏁 程式執行完畢！")
+        logger.info("=" * 60)
