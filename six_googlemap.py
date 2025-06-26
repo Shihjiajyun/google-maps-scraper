@@ -74,100 +74,10 @@ def setup_logging():
 # 初始化 logger
 logger = setup_logging()
 
-# ✅ 2. 台灣六都 + 屏東所有行政區中心座標
+# ✅ 2. 台灣六都 + 屏東所有行政區中心座標 (擴大版)
 area_keywords = [
-    # 台北市 (12區)
-    ("中正區", "25.0330,121.5183", "台北市"),
-    ("大同區", "25.0633,121.5130", "台北市"),
-    ("中山區", "25.0636,121.5264", "台北市"),
-    ("松山區", "25.0576,121.5776", "台北市"),
-    ("大安區", "25.0267,121.5436", "台北市"),
-    ("萬華區", "25.0374,121.4991", "台北市"),
-    ("信義區", "25.0330,121.5654", "台北市"),
-    ("士林區", "25.0877,121.5258", "台北市"),
-    ("北投區", "25.1315,121.5017", "台北市"),
-    ("內湖區", "25.0692,121.5897", "台北市"),
-    ("南港區", "25.0478,121.6073", "台北市"),
-    ("文山區", "24.9876,121.5707", "台北市"),
-
-    # 新北市 (29區)
-    ("板橋區", "25.0118,121.4625", "新北市"),
-    ("三重區", "25.0622,121.4848", "新北市"),
-    ("中和區", "24.9998,121.4991", "新北市"),
-    ("永和區", "25.0068,121.5161", "新北市"),
-    ("新莊區", "25.0372,121.4325", "新北市"),
-    ("新店區", "24.9669,121.5414", "新北市"),
-    ("樹林區", "24.9937,121.4200", "新北市"),
-    ("鶯歌區", "24.9542,121.3548", "新北市"),
-    ("三峽區", "24.9342,121.3688", "新北市"),
-    ("淡水區", "25.1645,121.4404", "新北市"),
-    ("汐止區", "25.0672,121.6422", "新北市"),
-    ("瑞芳區", "25.1090,121.8070", "新北市"),
-    ("土城區", "24.9729,121.4419", "新北市"),
-    ("蘆洲區", "25.0840,121.4741", "新北市"),
-    ("五股區", "25.0830,121.4439", "新北市"),
-    ("泰山區", "25.0594,121.4218", "新北市"),
-    ("林口區", "25.0769,121.3895", "新北市"),
-    ("深坑區", "24.9988,121.6161", "新北市"),
-    ("石碇區", "24.9895,121.6635", "新北市"),
-    ("坪林區", "24.9361,121.7098", "新北市"),
-    ("三芝區", "25.2519,121.4990", "新北市"),
-    ("石門區", "25.2915,121.5675", "新北市"),
-    ("八里區", "25.1496,121.3996", "新北市"),
-    ("平溪區", "25.0255,121.7417", "新北市"),
-    ("雙溪區", "25.0336,121.8264", "新北市"),
-    ("貢寮區", "25.0196,121.9085", "新北市"),
-    ("金山區", "25.2225,121.6341", "新北市"),
-    ("萬里區", "25.1797,121.6897", "新北市"),
-    ("烏來區", "24.8658,121.5497", "新北市"),
-
-    # 桃園市 (13區)
-    ("桃園區", "24.9936,121.3010", "桃園市"),
-    ("中壢區", "24.9537,121.2257", "桃園市"),
-    ("大溪區", "24.8838,121.2677", "桃園市"),
-    ("楊梅區", "24.9175,121.1459", "桃園市"),
-    ("蘆竹區", "25.0441,121.2914", "桃園市"),
-    ("大園區", "25.0569,121.2014", "桃園市"),
-    ("龜山區", "25.0002,121.3539", "桃園市"),
-    ("八德區", "24.9444,121.2999", "桃園市"),
-    ("龍潭區", "24.8632,121.2167", "桃園市"),
-    ("平鎮區", "24.9234,121.2043", "桃園市"),
-    ("新屋區", "24.9706,121.1061", "桃園市"),
-    ("觀音區", "25.0357,121.1220", "桃園市"),
-    ("復興區", "24.8176,121.3496", "桃園市"),
-
-    # 台中市 (29區)
-    ("中區", "24.1443,120.6794", "台中市"),
-    ("東區", "24.1369,120.6973", "台中市"),
-    ("南區", "24.1201,120.6642", "台中市"),
-    ("西區", "24.1393,120.6736", "台中市"),
-    ("北區", "24.1548,120.6848", "台中市"),
-    ("西屯區", "24.1618,120.6176", "台中市"),
-    ("南屯區", "24.1285,120.6185", "台中市"),
-    ("北屯區", "24.1810,120.7131", "台中市"),
-    ("豐原區", "24.2567,120.7236", "台中市"),
-    ("東勢區", "24.2610,120.8239", "台中市"),
-    ("大甲區", "24.3480,120.6242", "台中市"),
-    ("清水區", "24.2638,120.5685", "台中市"),
-    ("沙鹿區", "24.2260,120.5687", "台中市"),
-    ("梧棲區", "24.2552,120.5216", "台中市"),
-    ("后里區", "24.3047,120.7063", "台中市"),
-    ("神岡區", "24.2544,120.6647", "台中市"),
-    ("潭子區", "24.2067,120.7057", "台中市"),
-    ("大雅區", "24.2286,120.6520", "台中市"),
-    ("新社區", "24.2265,120.8069", "台中市"),
-    ("石岡區", "24.2725,120.7827", "台中市"),
-    ("外埔區", "24.3395,120.6519", "台中市"),
-    ("大安區", "24.3452,120.5992", "台中市"),
-    ("烏日區", "24.1062,120.6238", "台中市"),
-    ("大肚區", "24.1566,120.5416", "台中市"),
-    ("龍井區", "24.1926,120.5435", "台中市"),
-    ("霧峰區", "24.0669,120.6998", "台中市"),
-    ("太平區", "24.1241,120.7339", "台中市"),
-    ("大里區", "24.0992,120.6773", "台中市"),
-    ("和平區", "24.2395,121.0114", "台中市"),
-
-    # 台南市 (37區)
+    
+    # 台南市 (主要區域)
     ("中西區", "22.9912,120.2020", "台南市"),
     ("東區", "22.9837,120.2265", "台南市"),
     ("南區", "22.9735,120.1873", "台南市"),
@@ -177,36 +87,14 @@ area_keywords = [
     ("永康區", "23.0262,120.2571", "台南市"),
     ("歸仁區", "22.9661,120.2896", "台南市"),
     ("新化區", "23.0379,120.3117", "台南市"),
-    ("左鎮區", "23.0537,120.4070", "台南市"),
-    ("玉井區", "23.1244,120.4601", "台南市"),
-    ("楠西區", "23.1708,120.4856", "台南市"),
-    ("南化區", "23.0421,120.4769", "台南市"),
     ("仁德區", "22.9619,120.2477", "台南市"),
     ("關廟區", "22.9704,120.3304", "台南市"),
-    ("龍崎區", "22.9682,120.3567", "台南市"),
-    ("官田區", "23.1939,120.3860", "台南市"),
     ("麻豆區", "23.1804,120.2473", "台南市"),
     ("佳里區", "23.1646,120.1751", "台南市"),
-    ("西港區", "23.1252,120.2038", "台南市"),
-    ("七股區", "23.1415,120.0881", "台南市"),
-    ("將軍區", "23.2005,120.1695", "台南市"),
-    ("學甲區", "23.2308,120.1761", "台南市"),
-    ("北門區", "23.2678,120.1248", "台南市"),
     ("新營區", "23.3058,120.3169", "台南市"),
-    ("後壁區", "23.3665,120.3611", "台南市"),
-    ("白河區", "23.3516,120.4090", "台南市"),
-    ("東山區", "23.3279,120.3979", "台南市"),
-    ("六甲區", "23.2315,120.3477", "台南市"),
-    ("下營區", "23.2360,120.2639", "台南市"),
-    ("柳營區", "23.2776,120.3061", "台南市"),
-    ("鹽水區", "23.3196,120.2662", "台南市"),
     ("善化區", "23.1322,120.2969", "台南市"),
-    ("大內區", "23.1178,120.3520", "台南市"),
-    ("山上區", "23.1049,120.3738", "台南市"),
-    ("新市區", "23.0784,120.2951", "台南市"),
-    ("安定區", "23.1215,120.2270", "台南市"),
 
-    # 高雄市 (38區)
+    # 高雄市 (主要區域)
     ("鼓山區", "22.6515,120.2844", "高雄市"),
     ("左營區", "22.6873,120.3066", "高雄市"),
     ("三民區", "22.6466,120.3265", "高雄市"),
@@ -215,8 +103,6 @@ area_keywords = [
     ("新興區", "22.6317,120.3021", "高雄市"),
     ("前金區", "22.6263,120.2956", "高雄市"),
     ("前鎮區", "22.5918,120.3083", "高雄市"),
-    ("鹽埕區", "22.6242,120.2842", "高雄市"),
-    ("旗津區", "22.5884,120.2672", "高雄市"),
     ("小港區", "22.5653,120.3452", "高雄市"),
     ("楠梓區", "22.7283,120.3182", "高雄市"),
     ("仁武區", "22.7012,120.3603", "高雄市"),
@@ -224,29 +110,11 @@ area_keywords = [
     ("鳥松區", "22.6484,120.3629", "高雄市"),
     ("大寮區", "22.6057,120.3958", "高雄市"),
     ("林園區", "22.5006,120.3975", "高雄市"),
-    ("大樹區", "22.6671,120.4344", "高雄市"),
-    ("阿蓮區", "22.8844,120.3224", "高雄市"),
-    ("路竹區", "22.8562,120.2603", "高雄市"),
-    ("湖內區", "22.8993,120.2457", "高雄市"),
-    ("茄萣區", "22.8971,120.1804", "高雄市"),
-    ("永安區", "22.8337,120.2172", "高雄市"),
     ("岡山區", "22.7924,120.2982", "高雄市"),
-    ("彌陀區", "22.7896,120.2456", "高雄市"),
-    ("梓官區", "22.7511,120.2605", "高雄市"),
-    ("燕巢區", "22.7931,120.3622", "高雄市"),
-    ("田寮區", "22.8773,120.3869", "高雄市"),
-    ("旗山區", "22.8882,120.4812", "高雄市"),
-    ("美濃區", "22.9028,120.5598", "高雄市"),
-    ("杉林區", "22.9956,120.5481", "高雄市"),
-    ("內門區", "22.9537,120.4706", "高雄市"),
-    ("六龜區", "23.0182,120.6866", "高雄市"),
-    ("甲仙區", "23.0832,120.5914", "高雄市"),
-    ("桃源區", "23.2348,120.7437", "高雄市"),
-    ("那瑪夏區", "23.2396,120.6825", "高雄市"),
-    ("茂林區", "22.8937,120.6592", "高雄市"),
+    ("路竹區", "22.8562,120.2603", "高雄市"),
     ("橋頭區", "22.7568,120.3068", "高雄市"),
-
-    # 屏東縣 (33鄉鎮市)
+    
+    # 屏東縣 (主要區域)
     ("屏東市", "22.6690,120.4883", "屏東縣"),
     ("潮州鎮", "22.5508,120.5446", "屏東縣"),
     ("東港鎮", "22.4658,120.4476", "屏東縣"),
@@ -256,30 +124,9 @@ area_keywords = [
     ("麟洛鄉", "22.6515,120.5244", "屏東縣"),
     ("九如鄉", "22.7395,120.4823", "屏東縣"),
     ("里港鄉", "22.7758,120.4999", "屏東縣"),
-    ("鹽埔鄉", "22.7542,120.5527", "屏東縣"),
-    ("高樹鄉", "22.8058,120.6081", "屏東縣"),
     ("萬巒鄉", "22.5715,120.5907", "屏東縣"),
     ("內埔鄉", "22.6110,120.5655", "屏東縣"),
-    ("竹田鄉", "22.5839,120.5426", "屏東縣"),
-    ("新埤鄉", "22.4687,120.5566", "屏東縣"),
-    ("枋寮鄉", "22.3618,120.5908", "屏東縣"),
-    ("新園鄉", "22.4542,120.4582", "屏東縣"),
-    ("崁頂鄉", "22.5066,120.5034", "屏東縣"),
-    ("林邊鄉", "22.4287,120.5116", "屏東縣"),
-    ("南州鄉", "22.4900,120.5143", "屏東縣"),
-    ("佳冬鄉", "22.4272,120.5553", "屏東縣"),
-    ("琉球鄉", "22.3444,120.3714", "屏東縣"),
-    ("車城鄉", "22.0742,120.7090", "屏東縣"),
-    ("滿州鄉", "22.0288,120.7842", "屏東縣"),
-    ("枋山鄉", "22.2630,120.6552", "屏東縣"),
-    ("三地門鄉", "22.7179,120.6548", "屏東縣"),
-    ("霧台鄉", "22.7542,120.7394", "屏東縣"),
-    ("瑪家鄉", "22.6818,120.6737", "屏東縣"),
-    ("泰武鄉", "22.6081,120.6515", "屏東縣"),
-    ("來義鄉", "22.5284,120.6648", "屏東縣"),
-    ("春日鄉", "22.3966,120.6182", "屏東縣"),
-    ("獅子鄉", "22.2284,120.7208", "屏東縣"),
-    ("牡丹鄉", "22.1351,120.7834", "屏東縣")
+    ("竹田鄉", "22.5839,120.5426", "屏東縣")
 ]
 
 # ✅ 3. 提取LINE聯絡方式的函數
@@ -331,12 +178,13 @@ def search_places_nearby(keyword, location, radius):
             break
     return results
 
-# ✅ 4.1. 文字搜尋（更廣泛的搜尋）
+# ✅ 4.1. 文字搜尋（正確設定地理範圍限制）
 def search_places_text(keyword, location, radius):
     url = 'https://maps.googleapis.com/maps/api/place/textsearch/json'
     params = {
         'key': API_KEY,
-        'query': f"{keyword} {location}",
+        'query': keyword,  # ✅ 只使用關鍵字，不混入座標
+        'location': location,  # ✅ 正確使用 location 參數
         'radius': radius,
         'language': 'zh-TW'
     }
@@ -354,43 +202,271 @@ def search_places_text(keyword, location, radius):
             break
     return results
 
-# ✅ 4.2. 多關鍵字搜尋策略
-def search_places_comprehensive(keywords, location, radius):
-    """綜合搜尋策略：使用多個關鍵字和搜尋方法"""
+# ✅ 4.2. 擴大搜尋策略 - 增加店家數量
+def search_places_comprehensive_expanded(keywords, location, radius, area_name, city):
+    """擴大的搜尋策略：更多關鍵字、更寬鬆的地理限制"""
     all_results = []
+    seen_place_ids = set()  # 早期去重，避免重複處理相同店家
     
-    for keyword in keywords:
-        logger.info(f"   🔎 搜尋關鍵字：{keyword}")
-        print(f"   🔎 搜尋關鍵字：{keyword}")
-        
-        # 方法1: NearbySearch
+    # 解析中心座標
+    center_lat, center_lng = map(float, location.split(','))
+    
+    logger.info(f"   🔎 擴大搜尋策略啟用")
+    logger.info(f"   📍 搜尋中心：{area_name}, {city} ({location})")
+    print(f"   🔎 擴大搜尋策略 - 目標：更多店家")
+    
+    # 方法1: 廣泛的美容相關搜尋
+    broad_keywords = [
+        # 美甲類
+        "美甲", "光療指甲", "凝膠美甲", "日式美甲",
+        # 美睫類  
+        "美睫", "嫁接睫毛", "種睫毛", "睫毛延伸",
+        # 耳燭類
+        "耳燭", "耳燭療程", "耳燭SPA",
+        # 採耳類
+        "採耳", "掏耳", "耳部清潔", "耳SPA",
+        # 熱蠟類
+        "熱蠟", "熱蠟除毛", "蜜蠟除毛", "比基尼熱蠟", "私密處除毛"
+    ]
+    
+    for keyword in broad_keywords:
         try:
-            nearby_results = search_places_nearby(keyword, location, radius)
-            all_results.extend(nearby_results)
-            logger.info(f"      NearbySearch 找到 {len(nearby_results)} 筆")
-            time.sleep(1)
-        except Exception as e:
-            logger.error(f"      NearbySearch 失敗：{e}")
-        
-        # 方法2: TextSearch (更廣泛)
-        try:
+            # Text Search - 更廣範圍
             text_results = search_places_text(keyword, location, radius)
-            all_results.extend(text_results)
-            logger.info(f"      TextSearch 找到 {len(text_results)} 筆")
-            time.sleep(1)
+            geo_filtered = filter_by_location_relaxed(text_results, center_lat, center_lng, radius * 2, city)  # 地理過濾
+            relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
+            
+            for place in relevant_filtered:
+                place_id = place.get('place_id')
+                if place_id and place_id not in seen_place_ids:
+                    seen_place_ids.add(place_id)
+                    all_results.append(place)
+            
+            logger.info(f"      關鍵字 '{keyword}' (Text): 原始 {len(text_results)} → 地理過濾 {len(geo_filtered)} → 相關性過濾 {len(relevant_filtered)} 筆")
+            time.sleep(0.5)
+            
+            # Nearby Search - 精確搜尋
+            nearby_results = search_places_nearby(keyword, location, radius)
+            geo_filtered = filter_by_location_relaxed(nearby_results, center_lat, center_lng, radius * 2, city)
+            relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
+            
+            for place in relevant_filtered:
+                place_id = place.get('place_id')
+                if place_id and place_id not in seen_place_ids:
+                    seen_place_ids.add(place_id)
+                    all_results.append(place)
+            
+            logger.info(f"      關鍵字 '{keyword}' (Nearby): 原始 {len(nearby_results)} → 地理過濾 {len(geo_filtered)} → 相關性過濾 {len(relevant_filtered)} 筆")
+            time.sleep(0.5)
+            
         except Exception as e:
-            logger.error(f"      TextSearch 失敗：{e}")
+            logger.error(f"      關鍵字 '{keyword}' 搜尋失敗：{e}")
+    
+    # 方法2: 使用 Place Types 搜尋
+    try:
+        beauty_types_results = search_by_place_types(location, radius)
+        geo_filtered = filter_by_location_relaxed(beauty_types_results, center_lat, center_lng, radius * 2, city)
+        relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
         
-        # 方法3: 加上類別搜尋
-        try:
-            category_results = search_places_nearby(f"{keyword} 美容", location, radius)
-            all_results.extend(category_results)
-            logger.info(f"      類別搜尋 找到 {len(category_results)} 筆")
-            time.sleep(1)
-        except Exception as e:
-            logger.error(f"      類別搜尋 失敗：{e}")
+        for place in relevant_filtered:
+            place_id = place.get('place_id')
+            if place_id and place_id not in seen_place_ids:
+                seen_place_ids.add(place_id)
+                all_results.append(place)
+        
+        logger.info(f"      類型搜尋: 原始 {len(beauty_types_results)} → 地理過濾 {len(geo_filtered)} → 相關性過濾 {len(relevant_filtered)} 筆")
+    except Exception as e:
+        logger.error(f"      類型搜尋失敗：{e}")
+    
+    logger.info(f"   🎯 {area_name} 總計找到 {len(all_results)} 間不重複店家")
     
     return all_results
+
+# ✅ 4.2.1. 精確的 Place Types 搜尋
+def search_by_place_types(location, radius):
+    """使用 Google Places 的 type 參數搜尋美容相關店家"""
+    url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
+    
+    # 只使用精確的美容相關 place types
+    beauty_types = [
+        'beauty_salon',  # 美容院
+        'hair_care',     # 美髮護理  
+        'spa'            # SPA
+        # 移除 'establishment' - 太廣泛了
+    ]
+    
+    all_results = []
+    
+    for place_type in beauty_types:
+        params = {
+            'key': API_KEY,
+            'location': location,
+            'radius': radius,
+            'type': place_type,
+            'language': 'zh-TW'
+        }
+        
+        try:
+            results = []
+            while True:
+                res = requests.get(url, params=params).json()
+                results.extend(res.get('results', []))
+
+                next_page_token = res.get('next_page_token')
+                if next_page_token:
+                    time.sleep(2)
+                    params['pagetoken'] = next_page_token
+                else:
+                    break
+            
+            all_results.extend(results)
+            time.sleep(1)
+            
+        except Exception as e:
+            logger.error(f"類型 '{place_type}' 搜尋失敗：{e}")
+    
+    return all_results
+
+# ✅ 4.2.2. 放寬的地理範圍過濾函數
+def filter_by_location_relaxed(places, center_lat, center_lng, radius, target_city):
+    """更寬鬆的地理範圍過濾"""
+    import math
+    
+    def calculate_distance(lat1, lng1, lat2, lng2):
+        """計算兩點間距離（公尺）"""
+        R = 6371000  # 地球半徑（公尺）
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lng = math.radians(lng2 - lng1)
+        
+        a = (math.sin(delta_lat / 2) ** 2 + 
+             math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng / 2) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c
+        return distance
+    
+    filtered_places = []
+    
+    # 定義更寬鬆的城市名稱變體
+    city_variants = [target_city]
+    if "市" in target_city:
+        city_variants.append(target_city.replace("市", ""))
+    if "縣" in target_city:
+        city_variants.append(target_city.replace("縣", ""))
+    
+    for place in places:
+        # 更寬鬆的地址檢查
+        address = place.get('formatted_address', place.get('vicinity', ''))
+        
+        # 檢查是否包含任何城市變體
+        address_match = any(variant in address for variant in city_variants)
+        
+        if address_match:
+            # 距離檢查（如果有座標）
+            geometry = place.get('geometry', {})
+            if geometry:
+                location_data = geometry.get('location', {})
+                place_lat = location_data.get('lat')
+                place_lng = location_data.get('lng')
+                
+                if place_lat and place_lng:
+                    distance = calculate_distance(center_lat, center_lng, place_lat, place_lng)
+                    if distance <= radius * 2.5:  # 擴大到 2.5 倍範圍
+                        filtered_places.append(place)
+                else:
+                    # 沒有座標但地址正確，也加入
+                    filtered_places.append(place)
+            else:
+                # 沒有地理資訊但地址正確，也加入
+                filtered_places.append(place)
+        else:
+            # 即使地址不完全匹配，如果距離很近也加入
+            geometry = place.get('geometry', {})
+            if geometry:
+                location_data = geometry.get('location', {})
+                place_lat = location_data.get('lat')
+                place_lng = location_data.get('lng')
+                
+                if place_lat and place_lng:
+                    distance = calculate_distance(center_lat, center_lng, place_lat, place_lng)
+                    if distance <= radius:  # 在原始範圍內就加入
+                        filtered_places.append(place)
+    
+    return filtered_places
+
+# ✅ 4.2.3. 業務類型相關性過濾
+def filter_by_business_relevance(places):
+    """過濾掉不相關的業務類型"""
+    
+    # 美容相關關鍵字（店名中應該包含的）
+    beauty_keywords = [
+        '美甲', '光療指甲', '凝膠美甲', '日式美甲', '指甲',
+        '美睫', '嫁接睫毛', '種睫毛', '睫毛延伸', '睫毛', 
+        '耳燭', '耳燭療程', '耳燭SPA',
+        '採耳', '掏耳', '耳部清潔', '耳SPA',
+        '熱蠟', '熱蠟除毛', '蜜蠟除毛', '比基尼熱蠟', '私密處除毛', '除毛'
+    ]
+    
+    # 排除的關鍵字（明顯不相關的業務）
+    exclude_keywords = [
+        '幼稚園', '學校', '醫院', '診所', '藥局', '銀行', '郵局',
+        '超商', '便利商店', '7-11', '全家', '萊爾富', '加油站',
+        '中油', '台塑', '修車', '汽車', '機車', '通訊', '手機',
+        '電信', '網路', '餐廳', '小吃', '雞排', '飲料', '咖啡',
+        '便當', '麵店', '火鍋', '燒烤', '公司', '企業', '工廠',
+        '建設', '不動產', '房仲', '保險', '律師', '會計', '顧問'
+        '理髮','髮'
+    ]
+    
+    relevant_places = []
+    
+    for place in places:
+        name = place.get('name', '').lower()
+        address = place.get('formatted_address', place.get('vicinity', '')).lower()
+        
+        # 先檢查是否包含美容相關關鍵字
+        is_beauty_related = any(beauty_keyword in name or beauty_keyword in address 
+                               for beauty_keyword in beauty_keywords)
+        
+        # 檢查 Google Places 的 types（只保留精確的美容類型）
+        place_types = place.get('types', [])
+        has_beauty_type = any(ptype in ['beauty_salon', 'hair_care', 'spa'] 
+                             for ptype in place_types)
+        
+        # 如果包含美容關鍵字或有美容類型，直接加入（優先級最高）
+        if is_beauty_related or has_beauty_type:
+            relevant_places.append(place)
+            logger.info(f"      ✅ 美容相關店家：{place.get('name', '未知')}")
+            continue
+        
+        # 如果不是美容相關，才檢查是否需要排除
+        is_excluded = any(exclude_keyword in name or exclude_keyword in address 
+                         for exclude_keyword in exclude_keywords)
+        
+        if is_excluded:
+            logger.info(f"      ❌ 排除不相關店家：{place.get('name', '未知')}")
+            continue
+        else:
+            # 既不是美容相關，也不需要排除的，也加入（可能是其他相關的店家）
+            relevant_places.append(place)
+    
+    return relevant_places
+
+# ✅ 4.3. 全局緩存機制
+global_place_cache = {}  # place_id -> place_details 的緩存
+global_seen_places = set()  # 全局已處理的 place_id
+
+def get_place_details_cached(place_id):
+    """帶緩存的店家詳細資訊獲取"""
+    if place_id in global_place_cache:
+        logger.info(f"      使用緩存資料：{place_id[:20]}...")
+        return global_place_cache[place_id]
+    
+    # 如果沒有緩存，才發送API請求
+    details = get_place_details(place_id)
+    global_place_cache[place_id] = details
+    return details
 
 # ✅ 5. 取得店家詳細資訊（含電話、網站、評論等）
 def get_place_details(place_id):
@@ -418,52 +494,50 @@ def deduplicate_places(places):
     
     return unique_places
 
-# ✅ 7. 主程式：遍歷所有區域並輸出店家資訊
-def run_search_all_areas(keywords=None, radius=8000):
-    if keywords is None:
-        # 擴充關鍵字列表，包含相關變形詞
-        keywords = [
-            "美甲", "指甲彩繪", "凝膠指甲", "光療美甲",
-            "美睫", "睫毛嫁接", "接睫毛", "睫毛美容",
-            "耳燭", "耳燭療法", "耳朵SPA",
-            "採耳", "清耳垢", "耳朵清潔", "掏耳朵",
-            "熱蠟", "熱蠟除毛", "蜜蠟除毛"
-        ]
+# ✅ 7. 擴大版主程式：更多店家
+def run_search_all_areas(keywords=None, radius=12000):  # 預設擴大半徑到 12km
     all_results = []
     total_areas = len(area_keywords)
+    api_request_count = 0  # 追踪API請求次數
     
-    logger.info(f"🎯 搜尋關鍵字：{', '.join(keywords)}")
+    logger.info(f"🎯 擴大搜尋策略啟用")
     logger.info(f"📏 搜尋半徑：{radius} 公尺")
     logger.info(f"📊 總共需要搜尋 {total_areas} 個行政區")
+    logger.info(f"⚡ 預估API請求次數：{total_areas * 20} 次 (為了更多店家)")
     
-    print(f"🎯 搜尋關鍵字：{', '.join(keywords)}")
+    print(f"🎯 擴大搜尋策略啟用 - 目標：更多店家數量")
     print(f"📏 搜尋半徑：{radius} 公尺")
+    print(f"🔍 使用多樣化搜尋方法")
     
     for index, (area_name, center, city) in enumerate(area_keywords, 1):
         region_info = f"{city} {area_name} ({index}/{total_areas})"
         logger.info(f"🔍 開始搜尋區域：{region_info}")
         print(f"🔍 搜尋區域：{region_info}")
         
-        # 使用綜合搜尋策略
+        # 使用擴大的搜尋策略
         start_time = time.time()
-        places = search_places_comprehensive(keywords, center, radius)
+        places = search_places_comprehensive_expanded(keywords, center, radius, area_name, city)
         search_time = time.time() - start_time
+        api_request_count += 20  # 估計每個區域約20次請求
         
-        # 去除重複
-        unique_places = deduplicate_places(places)
-        
-        result_info = f"找到 {len(places)} 間店家，去重後 {len(unique_places)} 間，耗時 {search_time:.1f} 秒"
+        result_info = f"找到 {len(places)} 間店家，耗時 {search_time:.1f} 秒"
         logger.info(f"✅ {region_info} - {result_info}")
         print(result_info)
 
-        for place in unique_places:
+        for place in places:
+            place_id = place.get('place_id')
+            
+            # 全局去重檢查
+            if place_id in global_seen_places:
+                continue
+            global_seen_places.add(place_id)
+            
             try:
                 name = place.get('name')
-                address = place.get('vicinity')
-                place_id = place.get('place_id')
+                address = place.get('vicinity', place.get('formatted_address', ''))
                 
-                # 取得詳細資訊
-                details = get_place_details(place_id)
+                # 使用緩存的詳細資訊獲取
+                details = get_place_details_cached(place_id)
                 phone = details.get('formatted_phone_number', 'N/A')
                 website = details.get('website', '')
                 
@@ -479,7 +553,7 @@ def run_search_all_areas(keywords=None, radius=8000):
                 
                 # 從評論中搜尋LINE資訊
                 if line_contact == 'N/A' and details.get('reviews'):
-                    for review in details.get('reviews', [])[:5]:  # 只檢查前5個評論
+                    for review in details.get('reviews', [])[:3]:  # 減少到3個評論
                         review_text = review.get('text', '')
                         extracted_line = extract_line_contact(review_text)
                         if extracted_line != 'N/A':
@@ -511,42 +585,27 @@ def run_search_all_areas(keywords=None, radius=8000):
                 print(f"電話：{phone}")
                 print(f"LINE：{line_contact}")
                 print(f"網站：{website if website else 'N/A'}")
-                print(f"地圖：{maps_url}")
                 print("---")
                 
-                time.sleep(1)
+                time.sleep(0.3)  # 減少延遲時間
             except Exception as e:
                 error_msg = f"處理店家時發生錯誤：{e}"
                 logger.error(f"❌ {error_msg}")
                 print(f"❌ {error_msg}")
                 continue
 
-    # 最終全域去重
-    logger.info("\n🔄 開始進行最終去重處理...")
-    print("\n🔄 進行最終去重處理...")
-    
-    final_results = []
-    seen_places = set()
-    
-    for result in all_results:
-        # 使用店名+地址作為識別
-        identifier = f"{result['店名']}_{result['地址']}"
-        if identifier not in seen_places:
-            seen_places.add(identifier)
-            final_results.append(result)
-    
-    removed_count = len(all_results) - len(final_results)
-    
-    logger.info(f"✅ 去重完成：原有 {len(all_results)} 筆，去除 {removed_count} 筆重複，最終 {len(final_results)} 筆")
+    logger.info(f"\n📊 API請求統計：實際使用約 {api_request_count + len(all_results)} 次")
+    logger.info(f"✅ 全域去重：共找到 {len(all_results)} 筆不重複店家")
     logger.info("🎉 搜尋程序完成！")
     
-    print(f"✅ 去除 {removed_count} 筆重複資料")
-    print(f"🎉 最終完成，共 {len(final_results)} 筆店家資料")
+    print(f"\n📊 擴大搜尋完成")
+    print(f"✅ 共找到 {len(all_results)} 筆不重複店家")
+    print(f"🎉 最終完成！")
     
-    return final_results
+    return all_results
 
 # ✅ 8. 將結果寫入 CSV 檔案
-def save_to_csv(data, filename="taiwan_six_cities_beauty_shops.csv"):
+def save_to_csv(data, filename="taiwan_finally_beauty_shops.csv"):
     try:
         with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.DictWriter(f, fieldnames=['縣市', '區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
@@ -563,11 +622,14 @@ def save_to_csv(data, filename="taiwan_six_cities_beauty_shops.csv"):
 
 # ✅ 9. 執行主流程
 if __name__ == '__main__':
-    print("🚀 開始搜尋台灣六都 + 屏東的美容店家資料...")
-    print("💅 搜尋類型：美甲、美睫、耳燭、採耳、熱蠟")
-    print("📍 涵蓋區域：台北市、新北市、桃園市、台中市、台南市、高雄市、屏東縣")
+    print("🚀 開始搜尋台灣六都 + 屏東的美容店家資料... (優化版)")
+    print("💅 搜尋類型：美容、美甲、美睫、指甲、睫毛、採耳、耳燭、熱蠟、除毛、護膚等")
+    print("📍 涵蓋區域：台南市、高雄市、屏東縣")
     print(f"📊 總共 {len(area_keywords)} 個行政區")
-    print("🔍 搜尋策略：多關鍵字 + 多方法 + 擴大半徑")
+    print("⚡ 搜尋策略：精準版本 - 準確關鍵字 + 業務相關性過濾")
+    print("🔍 搜尋方法：關鍵字搜尋 + 類型搜尋 + 地理範圍優化 + 業務過濾")
+    print("📏 搜尋半徑：12km + 雙重過濾機制")
+    print("🚫 自動排除：學校、醫院、加油站、餐廳、通訊行等不相關業務")
     print("=" * 60)
     
     data = run_search_all_areas()

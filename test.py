@@ -40,7 +40,21 @@ if not API_KEY:
 
 print(f"✅ API 金鑰載入成功：{API_KEY[:10]}...")
 
-# ✅ 2. 高雄行政區＋中心座標（可擴充）
+# ✅ 2. 搜尋關鍵字列表
+search_keywords = [
+    # 美甲類
+    "美甲", "光療指甲", "凝膠美甲", "日式美甲",
+    # 美睫類  
+    "美睫", "嫁接睫毛", "種睫毛", "睫毛延伸",
+    # 耳燭類
+    "耳燭", "耳燭療程", "耳燭SPA",
+    # 採耳類
+    "採耳", "掏耳", "耳部清潔", "耳SPA",
+    # 熱蠟類
+    "熱蠟", "熱蠟除毛", "蜜蠟除毛", "比基尼熱蠟", "私密處除毛"
+]
+
+# ✅ 3. 高雄行政區＋中心座標（可擴充）
 area_keywords = [
     ("鼓山區", "22.6515,120.2844"),
     ("左營區", "22.6873,120.3066"),
@@ -81,7 +95,7 @@ area_keywords = [
     ("茂林區", "22.8937,120.6592")
 ]
 
-# ✅ 3. 提取LINE聯絡方式的函數
+# ✅ 4. 提取LINE聯絡方式的函數
 def extract_line_contact(text):
     """從文字中提取LINE聯絡方式"""
     if not text:
@@ -106,7 +120,7 @@ def extract_line_contact(text):
     
     return 'N/A'
 
-# ✅ 4. 搜尋附近店家（最多 60 筆）
+# ✅ 5. 搜尋附近店家（最多 60 筆）
 def search_places(keyword, location, radius):
     url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
     params = {
@@ -130,7 +144,7 @@ def search_places(keyword, location, radius):
             break
     return results
 
-# ✅ 5. 取得店家詳細資訊（含電話、網站、評論等）
+# ✅ 6. 取得店家詳細資訊（含電話、網站、評論等）
 def get_place_details(place_id):
     url = 'https://maps.googleapis.com/maps/api/place/details/json'
     params = {
@@ -142,16 +156,33 @@ def get_place_details(place_id):
     res = requests.get(url, params=params).json()
     return res.get('result', {})
 
-# ✅ 6. 主程式：遍歷所有區域並輸出店家資訊
-def run_search_all_areas(keyword="美甲", radius=5000):
+# ✅ 7. 主程式：遍歷所有區域和關鍵字並輸出店家資訊
+def run_search_all_areas(radius=5000):
     all_results = []
+    seen_place_ids = set()  # 避免重複店家
 
     for area_name, center in area_keywords:
-        print(f"🔍 搜尋區域：{area_name}")
-        places = search_places(keyword, center, radius)
-        print(f"找到 {len(places)} 間店家")
+        print(f"\n🌍 搜尋區域：{area_name}")
+        area_places = []
+        
+        for keyword in search_keywords:
+            print(f"🔍 關鍵字：{keyword}")
+            places = search_places(keyword, center, radius)
+            
+            # 過濾掉已經處理過的店家
+            new_places = [place for place in places if place.get('place_id') not in seen_place_ids]
+            area_places.extend(new_places)
+            
+            # 記錄已處理的店家ID
+            for place in new_places:
+                seen_place_ids.add(place.get('place_id'))
+            
+            print(f"   找到 {len(new_places)} 間新店家")
+            time.sleep(1)  # 避免API請求過快
+        
+        print(f"✅ {area_name} 總共找到 {len(area_places)} 間不重複店家")
 
-        for place in places:
+        for place in area_places:
             try:
                 name = place.get('name')
                 address = place.get('vicinity')
@@ -213,15 +244,15 @@ def run_search_all_areas(keyword="美甲", radius=5000):
     print(f"\n✅ 全部完成，共 {len(all_results)} 筆店家資料")
     return all_results
 
-# ✅ 7. 將結果寫入 CSV 檔案
-def save_to_csv(data, filename="kaohsiung_nail_shops.csv"):
+# ✅ 8. 將結果寫入 CSV 檔案
+def save_to_csv(data, filename="kaohsiung_beauty_shops.csv"):
     with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=['區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
         writer.writeheader()
         writer.writerows(data)
     print(f"\n📁 成功輸出至 CSV 檔案：{filename}")
 
-# ✅ 8. 執行主流程
+# ✅ 9. 執行主流程
 if __name__ == '__main__':
     data = run_search_all_areas()
     save_to_csv(data)
