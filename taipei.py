@@ -177,26 +177,36 @@ def search_places_comprehensive_expanded(keywords, location, radius, area_name, 
     logger.info(f"   📍 搜尋中心：{area_name}, {city} ({location})")
     print(f"   🔎 擴大搜尋策略 - 目標：更多店家")
     
+    # 縮小搜索半徑以提高準確度
+    search_radius = min(radius, 5000)  # 最大5公里
+    
     # 方法1: 廣泛的美容相關搜尋
     broad_keywords = [
         # 美甲類
-        "美甲", "光療指甲", "凝膠美甲", "日式美甲",
+        "美甲", "光療指甲", "凝膠美甲", "日式美甲", "nail",
         # 美睫類  
-        "美睫", "嫁接睫毛", "種睫毛", "睫毛延伸",
+        "美睫", "嫁接睫毛", "種睫毛", "睫毛延伸", "eyelash",
         # 耳燭類
-        "耳燭", "耳燭療程", "耳燭SPA",
+        "耳燭", "耳燭療程", "耳燭SPA", "ear candling",
         # 採耳類
-        "採耳", "掏耳", "耳部清潔", "耳SPA",
+        "採耳", "掏耳", "耳部清潔", "耳SPA", "ear cleaning",
         # 熱蠟類
-        "熱蠟", "熱蠟除毛", "蜜蠟除毛", "比基尼熱蠟", "私密處除毛"
+        "熱蠟", "熱蠟除毛", "蜜蠟除毛", "比基尼熱蠟", "私密處除毛", "waxing"
     ]
     
     for keyword in broad_keywords:
         try:
             # Text Search - 更廣範圍
-            text_results = search_places_text(keyword, location, radius)
-            geo_filtered = filter_by_location_relaxed(text_results, center_lat, center_lng, radius * 2, city)  # 地理過濾
-            relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
+            text_results = search_places_text(keyword, location, search_radius)
+            if len(text_results) == 0:
+                logger.info(f"      ⚠️ 關鍵字 '{keyword}' 搜尋無結果，嘗試不同寫法...")
+                # 如果是中文關鍵字，嘗試不同的寫法
+                if "台" in keyword:
+                    keyword_variant = keyword.replace("台", "臺")
+                    text_results = search_places_text(keyword_variant, location, search_radius)
+            
+            geo_filtered = filter_by_location_relaxed(text_results, center_lat, center_lng, search_radius * 2, city)
+            relevant_filtered = filter_by_business_relevance(geo_filtered)
             
             for place in relevant_filtered:
                 place_id = place.get('place_id')
@@ -208,9 +218,13 @@ def search_places_comprehensive_expanded(keywords, location, radius, area_name, 
             time.sleep(0.5)
             
             # Nearby Search - 精確搜尋
-            nearby_results = search_places_nearby(keyword, location, radius)
-            geo_filtered = filter_by_location_relaxed(nearby_results, center_lat, center_lng, radius * 2, city)
-            relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
+            nearby_results = search_places_nearby(keyword, location, search_radius)
+            if len(nearby_results) == 0 and "台" in keyword:
+                keyword_variant = keyword.replace("台", "臺")
+                nearby_results = search_places_nearby(keyword_variant, location, search_radius)
+            
+            geo_filtered = filter_by_location_relaxed(nearby_results, center_lat, center_lng, search_radius * 2, city)
+            relevant_filtered = filter_by_business_relevance(geo_filtered)
             
             for place in relevant_filtered:
                 place_id = place.get('place_id')
@@ -223,12 +237,13 @@ def search_places_comprehensive_expanded(keywords, location, radius, area_name, 
             
         except Exception as e:
             logger.error(f"      關鍵字 '{keyword}' 搜尋失敗：{e}")
+            continue  # 繼續下一個關鍵字
     
     # 方法2: 使用 Place Types 搜尋
     try:
-        beauty_types_results = search_by_place_types(location, radius)
-        geo_filtered = filter_by_location_relaxed(beauty_types_results, center_lat, center_lng, radius * 2, city)
-        relevant_filtered = filter_by_business_relevance(geo_filtered)  # 業務相關性過濾
+        beauty_types_results = search_by_place_types(location, search_radius)
+        geo_filtered = filter_by_location_relaxed(beauty_types_results, center_lat, center_lng, search_radius * 2, city)
+        relevant_filtered = filter_by_business_relevance(geo_filtered)
         
         for place in relevant_filtered:
             place_id = place.get('place_id')
@@ -311,49 +326,46 @@ def filter_by_location_relaxed(places, center_lat, center_lng, radius, target_ci
     filtered_places = []
     
     # 定義更寬鬆的城市名稱變體
-    city_variants = [target_city]
-    if "市" in target_city:
-        city_variants.append(target_city.replace("市", ""))
-    if "縣" in target_city:
-        city_variants.append(target_city.replace("縣", ""))
+    city_variants = [
+        target_city,
+        target_city.replace("台", "臺"),
+        target_city.replace("臺", "台"),
+        target_city.replace("市", ""),
+        target_city.replace("台", "臺").replace("市", ""),
+        target_city.replace("臺", "台").replace("市", ""),
+        "Taipei",
+        "New Taipei",
+        "Taichung",
+        "Tainan",
+        "Kaohsiung"
+    ]
     
     for place in places:
         # 更寬鬆的地址檢查
-        address = place.get('formatted_address', place.get('vicinity', ''))
+        address = place.get('formatted_address', place.get('vicinity', '')).lower()
+        name = place.get('name', '').lower()
         
-        # 檢查是否包含任何城市變體
-        address_match = any(variant in address for variant in city_variants)
+        # 檢查是否包含任何城市變體（在地址或店名中）
+        address_match = any(variant.lower() in address.lower() or variant.lower() in name.lower() 
+                          for variant in city_variants)
         
-        if address_match:
-            # 距離檢查（如果有座標）
-            geometry = place.get('geometry', {})
-            if geometry:
-                location_data = geometry.get('location', {})
-                place_lat = location_data.get('lat')
-                place_lng = location_data.get('lng')
-                
-                if place_lat and place_lng:
-                    distance = calculate_distance(center_lat, center_lng, place_lat, place_lng)
-                    if distance <= radius * 2.5:  # 擴大到 2.5 倍範圍
-                        filtered_places.append(place)
-                else:
-                    # 沒有座標但地址正確，也加入
+        # 如果有座標，優先使用距離判斷
+        geometry = place.get('geometry', {})
+        if geometry:
+            location_data = geometry.get('location', {})
+            place_lat = location_data.get('lat')
+            place_lng = location_data.get('lng')
+            
+            if place_lat and place_lng:
+                distance = calculate_distance(center_lat, center_lng, place_lat, place_lng)
+                # 如果距離在範圍內，直接加入
+                if distance <= radius:
                     filtered_places.append(place)
-            else:
-                # 沒有地理資訊但地址正確，也加入
-                filtered_places.append(place)
-        else:
-            # 即使地址不完全匹配，如果距離很近也加入
-            geometry = place.get('geometry', {})
-            if geometry:
-                location_data = geometry.get('location', {})
-                place_lat = location_data.get('lat')
-                place_lng = location_data.get('lng')
-                
-                if place_lat and place_lng:
-                    distance = calculate_distance(center_lat, center_lng, place_lat, place_lng)
-                    if distance <= radius:  # 在原始範圍內就加入
-                        filtered_places.append(place)
+                    continue
+        
+        # 如果沒有座標或距離過遠，但地址匹配城市，也加入
+        if address_match:
+            filtered_places.append(place)
     
     return filtered_places
 
