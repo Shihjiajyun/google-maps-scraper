@@ -567,7 +567,7 @@ def run_search_all_areas(keywords=None, radius=12000):  # 預設擴大半徑到 
     return all_results
 
 # ✅ 8. 將結果寫入 CSV 檔案
-def save_to_csv(data, filename="taiwan_finally_beauty_shops.csv"):
+def save_to_csv(data, filename="taipei.csv"):
     try:
         with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.DictWriter(f, fieldnames=['縣市', '區域', '店名', '地址', '電話', 'LINE聯絡方式', '網站', '地圖連結'])
